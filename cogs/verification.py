@@ -230,8 +230,13 @@ class Verification(commands.Cog):
             )
             return
 
+        settings = get_verification_settings(interaction.guild.id)
+        verified_role_id = settings.get("verified_role_id")
+        verified_role = interaction.guild.get_role(verified_role_id) if verified_role_id else None
+
         everyone_role = interaction.guild.default_role
         try:
+            # Unverified: can view read-only
             await channel.set_permissions(
                 everyone_role,
                 view_channel=True,
@@ -239,6 +244,14 @@ class Verification(commands.Cog):
                 add_reactions=False,
                 reason="Verification Read-Only Exception",
             )
+            # Verified: can view and send
+            if verified_role:
+                await channel.set_permissions(
+                    verified_role,
+                    view_channel=True,
+                    send_messages=True,
+                    reason="Verification Exception — verified role access",
+                )
         except discord.Forbidden:
             await interaction.response.send_message(
                 f"{config.EMOJI_CROSS} Missing permissions to edit channel overwrites.",
@@ -247,7 +260,7 @@ class Verification(commands.Cog):
             return
 
         await interaction.response.send_message(
-            f"{config.EMOJI_TICK} {channel.mention} is now an exception channel — unverified users can view it read-only.",
+            f"{config.EMOJI_TICK} {channel.mention} is now an exception channel — unverified users can view it read-only, verified members can chat.",
             ephemeral=True,
         )
 
@@ -266,13 +279,26 @@ class Verification(commands.Cog):
             )
             return
 
+        settings = get_verification_settings(interaction.guild.id)
+        verified_role_id = settings.get("verified_role_id")
+        verified_role = interaction.guild.get_role(verified_role_id) if verified_role_id else None
+
         everyone_role = interaction.guild.default_role
         try:
+            # Lock @everyone out again
             await channel.set_permissions(
                 everyone_role,
                 view_channel=False,
                 reason="Verification Exception Removed",
             )
+            # Verified role: view only, no explicit send_messages override
+            if verified_role:
+                await channel.set_permissions(
+                    verified_role,
+                    view_channel=True,
+                    send_messages=True,
+                    reason="Verification Exception Removed — reset to standard",
+                )
         except discord.Forbidden:
             await interaction.response.send_message(
                 f"{config.EMOJI_CROSS} Exception removed from config, but missing permissions to update channel overwrites.",
