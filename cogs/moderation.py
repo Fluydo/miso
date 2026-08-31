@@ -1,6 +1,7 @@
 import io
 import logging
 from datetime import datetime, timezone
+from typing import Optional
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -893,6 +894,75 @@ class Moderation(commands.Cog):
         if file:
             log_embed.set_image(url="attachment://mod_action.png")
         await send_mod_log(interaction.guild, log_embed, file=file, log_type="moderation")
+
+    # ==========================================
+    # /slowmode
+    # ==========================================
+    @app_commands.command(name="slowmode", description="Set or remove slowmode on a channel.")
+    @app_commands.describe(
+        seconds="Slowmode delay in seconds (0 = off, max 21600 / 6 hours)",
+        channel="Channel to apply slowmode to (defaults to current channel)",
+    )
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_channels=True)
+    @app_commands.checks.bot_has_permissions(manage_channels=True)
+    async def slowmode(
+        self,
+        interaction: discord.Interaction,
+        seconds: app_commands.Range[int, 0, 21600],
+        channel: Optional[discord.TextChannel] = None,
+    ) -> None:
+        if not interaction.guild:
+            return
+
+        target = channel or interaction.channel
+        if not isinstance(target, discord.TextChannel):
+            await interaction.response.send_message(
+                embed=error_embed("Slowmode can only be set on text channels."),
+                ephemeral=True,
+            )
+            return
+
+        try:
+            await target.edit(slowmode_delay=seconds)
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                embed=error_embed("Missing permissions to edit that channel."),
+                ephemeral=True,
+            )
+            return
+
+        if seconds == 0:
+            desc = f"{config.EMOJI_TICK} Slowmode **disabled** in {target.mention}."
+        else:
+            # Format a human-readable duration
+            hours, remainder = divmod(seconds, 3600)
+            minutes, secs = divmod(remainder, 60)
+            parts = []
+            if hours:
+                parts.append(f"{hours}h")
+            if minutes:
+                parts.append(f"{minutes}m")
+            if secs:
+                parts.append(f"{secs}s")
+            duration = " ".join(parts)
+            desc = (
+                f"{config.EMOJI_TICK} Slowmode set to **{duration}** in {target.mention}.\n"
+                f"Users must wait `{duration}` between messages."
+            )
+
+        embed = discord.Embed(description=desc, color=config.COLOR_SUCCESS)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        log_embed = mod_action_log_embed(
+            action="Slowmode Updated",
+            moderator_id=interaction.user.id,
+            reason=f"{'Disabled' if seconds == 0 else f'Set to {seconds}s'} in #{target.name}",
+            channel_id=target.id,
+            extra_info=f"Delay: `{seconds}s`",
+            color=config.COLOR_INFO,
+        )
+        await send_mod_log(interaction.guild, log_embed, log_type="server")
 
 
 async def setup(bot: commands.Bot) -> None:
