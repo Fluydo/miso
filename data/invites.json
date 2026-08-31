@@ -1,0 +1,28 @@
+{
+  "1543920075097251850": {
+    "invites": {
+      "ecwyUUHWe": {
+        "inviter_id": 1248228387726688276,
+        "uses": 2,
+        "max_uses": 0,
+        "max_age": 2592000,
+        "created_at": "2026-08-31T13:39:12.547303+00:00"
+      },
+      "VpmnrDhnu": {
+        "inviter_id": 1248228387726688276,
+        "uses": 1,
+        "max_uses": 0,
+        "max_age": 2592000,
+        "created_at": "2026-08-31T17:13:03.351849+00:00"
+      }
+    },
+    "members": {
+      "1057097150145773641": {
+        "inviter_id": 1248228387726688276,
+        "invite_code": "ecwyUUHWe",
+        "joined_at": "2026-08-31T17:07:56.495064+00:00",
+        "status": "active"
+      }
+    }
+  }
+}

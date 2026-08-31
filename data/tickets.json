@@ -1,0 +1,15 @@
+{
+  "1543920075097251850": {
+    "category_id": 1544036611220701354,
+    "ticket_counter": 2,
+    "active_tickets": {
+      "1544033762302631972": {
+        "ticket_num": 1,
+        "user_id": 1248228387726688276,
+        "type": "support",
+        "created_at": "2026-08-31T17:18:55.807782+00:00",
+        "claimed_by": null
+      }
+    }
+  }
+}
