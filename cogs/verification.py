@@ -37,10 +37,12 @@ class VerifyButton(discord.ui.Button):
         if not interaction.guild or not isinstance(interaction.user, discord.Member):
             return
 
+        await interaction.response.defer(ephemeral=True)
+
         settings = get_verification_settings(interaction.guild.id)
         role_id = settings.get("verified_role_id")
         if not role_id:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Verification role has not been configured.",
                 ephemeral=True,
             )
@@ -48,14 +50,14 @@ class VerifyButton(discord.ui.Button):
 
         verified_role = interaction.guild.get_role(role_id)
         if not verified_role:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Verified role not found on the server.",
                 ephemeral=True,
             )
             return
 
         if verified_role in interaction.user.roles:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"{config.EMOJI_INFO} You are already verified in **{interaction.guild.name}**!",
                 ephemeral=True,
             )
@@ -64,13 +66,13 @@ class VerifyButton(discord.ui.Button):
         try:
             await interaction.user.add_roles(verified_role, reason="Passed server verification panel")
         except discord.Forbidden:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Failed to assign role due to bot hierarchy permissions.",
                 ephemeral=True,
             )
             return
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"{config.EMOJI_TICK} **Successfully Verified!** Welcome to **{interaction.guild.name}**.",
             ephemeral=True,
         )
