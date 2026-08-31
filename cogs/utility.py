@@ -63,6 +63,8 @@ class Utility(commands.Cog):
         await interaction.response.send_message(view=view)
 
     @app_commands.command(name="botinfo", description="View information and performance statistics about Miso.")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
     async def botinfo(self, interaction: discord.Interaction) -> None:
         uptime = time.time() - self.start_time
         embed = bot_info_embed(self.bot, uptime)

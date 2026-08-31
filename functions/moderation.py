@@ -380,6 +380,7 @@ async def _get_or_create_forum_thread(
     forum: discord.ForumChannel,
     thread_name: str,
     default_embed: discord.Embed | None = None,
+    file: discord.File | None = None,
 ) -> tuple[discord.Thread | None, bool]:
     """
     Finds existing thread or creates it.
@@ -419,6 +420,8 @@ async def _get_or_create_forum_thread(
         "embed": intro,
         "reason": f"Auto-created {thread_name} thread for Miso logging",
     }
+    if file:
+        create_kwargs["file"] = file
     if forum.flags.require_tag and forum.available_tags:
         create_kwargs["applied_tags"] = [forum.available_tags[0]]
 
@@ -470,10 +473,14 @@ async def send_mod_log(
         if isinstance(channel, discord.ForumChannel):
             cfg = FORUM_THREAD_CONFIG.get(log_type, {"name": f"📋・{log_type}"})
             thread_name = cfg["name"]
-            thread, newly_created = await _get_or_create_forum_thread(channel, thread_name, embed)
+            thread, newly_created = await _get_or_create_forum_thread(channel, thread_name, embed, file)
             if thread:
-                # If newly created, thread already has the initial embed; if we have a file/view, send it
-                if not newly_created or file or view:
+                if newly_created:
+                    # embed + file were already sent as the starter post by create_thread.
+                    # Only send a follow-up if there's a view to attach.
+                    if view:
+                        await thread.send(view=view)
+                else:
                     await thread.send(**send_kwargs)
         elif isinstance(channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
             permissions = channel.permissions_for(guild.me)
