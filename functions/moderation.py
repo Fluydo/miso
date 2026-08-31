@@ -95,6 +95,118 @@ def set_mod_log_channel_id(guild_id: int, channel_id: int | None) -> None:
 
 
 # ==========================================
+# IMAGE-ONLY CHANNELS
+# ==========================================
+
+def get_image_channels(guild_id: int) -> list[int]:
+    """Returns the list of image-only channel IDs for the guild."""
+    settings = load_guild_settings()
+    return settings.get(str(guild_id), {}).get("image_channels", [])
+
+
+def add_image_channel(guild_id: int, channel_id: int) -> bool:
+    """Registers a channel as image-only. Returns False if already registered."""
+    settings = load_guild_settings()
+    key = str(guild_id)
+    if key not in settings:
+        settings[key] = {}
+    channels = settings[key].setdefault("image_channels", [])
+    if channel_id in channels:
+        return False
+    channels.append(channel_id)
+    save_guild_settings(settings)
+    return True
+
+
+def remove_image_channel(guild_id: int, channel_id: int) -> bool:
+    """Unregisters an image-only channel. Returns False if it wasn't registered."""
+    settings = load_guild_settings()
+    key = str(guild_id)
+    channels = settings.get(key, {}).get("image_channels", [])
+    if channel_id not in channels:
+        return False
+    channels.remove(channel_id)
+    settings[key]["image_channels"] = channels
+    save_guild_settings(settings)
+    return True
+
+
+# ==========================================
+# COUNTING CHANNELS
+# ==========================================
+
+def get_counting_config(guild_id: int) -> dict:
+    """
+    Returns counting config for the guild.
+    Keys: channel_id (int|None), enabled (bool), last_number (int), last_user_id (int|None)
+    """
+    settings = load_guild_settings()
+    return settings.get(str(guild_id), {}).get("counting", {
+        "channel_id": None,
+        "enabled": False,
+        "last_number": 0,
+        "last_user_id": None,
+    })
+
+
+def set_counting_channel(guild_id: int, channel_id: int) -> None:
+    """Sets the counting channel and resets the count."""
+    settings = load_guild_settings()
+    key = str(guild_id)
+    if key not in settings:
+        settings[key] = {}
+    settings[key]["counting"] = {
+        "channel_id": channel_id,
+        "enabled": True,
+        "last_number": 0,
+        "last_user_id": None,
+    }
+    save_guild_settings(settings)
+
+
+def set_counting_enabled(guild_id: int, enabled: bool) -> None:
+    """Toggles counting enforcement on or off."""
+    settings = load_guild_settings()
+    key = str(guild_id)
+    if key not in settings:
+        settings[key] = {}
+    cfg = settings[key].setdefault("counting", {
+        "channel_id": None,
+        "enabled": False,
+        "last_number": 0,
+        "last_user_id": None,
+    })
+    cfg["enabled"] = enabled
+    save_guild_settings(settings)
+
+
+def update_counting_state(guild_id: int, last_number: int, last_user_id: int) -> None:
+    """Advances the count after a valid message."""
+    settings = load_guild_settings()
+    key = str(guild_id)
+    cfg = settings.get(key, {}).get("counting", {})
+    cfg["last_number"] = last_number
+    cfg["last_user_id"] = last_user_id
+    if key not in settings:
+        settings[key] = {}
+    settings[key]["counting"] = cfg
+    save_guild_settings(settings)
+
+
+def reset_counting(guild_id: int) -> None:
+    """Resets the count back to 0 (called after a wrong number)."""
+    settings = load_guild_settings()
+    key = str(guild_id)
+    cfg = settings.get(key, {}).get("counting", {})
+    cfg["last_number"] = 0
+    cfg["last_user_id"] = None
+    if key not in settings:
+        settings[key] = {}
+    settings[key]["counting"] = cfg
+    save_guild_settings(settings)
+
+
+# ==========================================
 # WARNINGS STORAGE
 # ==========================================
 
