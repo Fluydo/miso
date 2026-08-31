@@ -134,7 +134,7 @@ class Moderation(commands.Cog):
             except Exception as e:
                 logger.error(f"Failed to auto-create forum threads: {e}")
 
-        embed = mod_log_set_embed(channel.id, is_forum=is_forum)
+        embed = mod_log_set_embed(interaction.user.id, channel.id, is_forum=is_forum)
         if is_forum and forum_threads_created:
             embed.add_field(
                 name=f"{config.EMOJI_TICK} Threads Created",
@@ -158,7 +158,7 @@ class Moderation(commands.Cog):
             return
 
         set_mod_log_channel_id(interaction.guild.id, None)
-        embed = mod_log_disabled_embed()
+        embed = mod_log_disabled_embed(interaction.user.id)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="modlogstatus", description="Check the currently configured mod log channel.")
