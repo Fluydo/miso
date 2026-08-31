@@ -75,3 +75,7 @@ COLOR_SUCCESS: int = 0x57F287    # Green (Unbans, Clears, Success)
 COLOR_WARNING: int = 0xFEE75C    # Yellow (Warnings, Timeouts)
 COLOR_ERROR: int = 0xED4245      # Red (Bans, Kicks, Errors)
 COLOR_INFO: int = 0xA240F7       # Information / Theme
+
+# Supabase Configuration
+SUPABASE_URL: str = os.getenv("SUPABASE_URL", "https://cunbjamcjggtoayryluq.supabase.co")
+SUPABASE_SERVICE_KEY: str = os.getenv("SUPABASE_SERVICE_KEY", "")

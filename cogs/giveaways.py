@@ -19,9 +19,10 @@ from functions.giveaways import (
     load_giveaways,
     reroll_giveaway,
 )
+from functions.supabase_sync import sync_giveaway_to_supabase, sync_giveaway_entry_to_supabase
 from functions.time_parser import format_duration, parse_duration
 
-logger = logging.getLogger("miso.cogs.giveaways")
+WEBSITE_URL = "https://miso-dashboard-iota.vercel.app"
 
 
 class GiveawayJoinButton(discord.ui.Button):
@@ -35,13 +36,17 @@ class GiveawayJoinButton(discord.ui.Button):
         self.target_message_id = message_id
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(ephemeral=True)
         is_added, count = add_entry(self.target_message_id, interaction.user.id)
         self.label = f"Enter ({count})"
 
+        # Sync to Supabase
+        asyncio.create_task(sync_giveaway_entry_to_supabase(self.target_message_id, interaction.user.id, is_added))
+
         if is_added:
-            await interaction.response.send_message("🎉 You have entered the giveaway! Good luck!", ephemeral=True)
+            await interaction.followup.send("🎉 You have entered the giveaway! Good luck!", ephemeral=True)
         else:
-            await interaction.response.send_message("❌ You left the giveaway.", ephemeral=True)
+            await interaction.followup.send("❌ You left the giveaway.", ephemeral=True)
 
         try:
             view: discord.ui.View = self.view  # type: ignore
@@ -54,6 +59,12 @@ class GiveawayView(discord.ui.View):
     def __init__(self, message_id: int, count: int = 0) -> None:
         super().__init__(timeout=None)
         self.add_item(GiveawayJoinButton(message_id, count))
+        self.add_item(discord.ui.Button(
+            label="Website: Click Me!",
+            style=discord.ButtonStyle.link,
+            emoji="🌐",
+            url=f"{WEBSITE_URL}/giveaways/{message_id}",
+        ))
 
 
 class Giveaways(commands.Cog):
@@ -102,6 +113,21 @@ class Giveaways(commands.Cog):
                     desc = f"🎉 Congratulations {winners_mentions}!\nYou won **{record['prize']}**!"
                 else:
                     desc = "No valid entries were submitted for this giveaway."
+
+                # Sync ended status to Supabase
+                asyncio.create_task(
+                    sync_giveaway_to_supabase(
+                        message_id=mid,
+                        guild_id=record["guild_id"],
+                        channel_id=record["channel_id"],
+                        prize=record["prize"],
+                        winners_count=record["winners_count"],
+                        end_timestamp=record["end_timestamp"],
+                        host_id=record["host_id"],
+                        active=False,
+                        winner_discord_id=str(winners[0]) if winners else None,
+                    )
+                )
 
                 end_embed = discord.Embed(
                     title="🎁 GIVEAWAY ENDED 🎁",
@@ -185,6 +211,20 @@ class Giveaways(commands.Cog):
             winners_count=winners,
             end_timestamp=end_ts,
             host_id=interaction.user.id,
+        )
+
+        # Sync to Supabase
+        asyncio.create_task(
+            sync_giveaway_to_supabase(
+                message_id=msg.id,
+                guild_id=interaction.guild.id,
+                channel_id=interaction.channel_id,
+                prize=prize,
+                winners_count=winners,
+                end_timestamp=end_ts,
+                host_id=interaction.user.id,
+                active=True,
+            )
         )
 
         view = GiveawayView(message_id=msg.id, count=0)
