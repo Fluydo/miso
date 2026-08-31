@@ -82,7 +82,7 @@ def get_mod_log_channel_id(guild_id: int) -> int | None:
     return settings.get(guild_key, {}).get("mod_log_channel_id")
 
 
-def set_mod_log_channel_id(guild_id: int, channel_id: int | None) -> None:
+def set_mod_log_channel_id(guild_id: int, channel_id: int | None, is_forum: bool = False) -> None:
     """Sets or clears the mod log channel ID for a guild."""
     settings = load_guild_settings()
     guild_key = str(guild_id)
@@ -91,6 +91,7 @@ def set_mod_log_channel_id(guild_id: int, channel_id: int | None) -> None:
         settings[guild_key] = {}
 
     settings[guild_key]["mod_log_channel_id"] = channel_id
+    settings[guild_key]["mod_log_is_forum"] = is_forum
     save_guild_settings(settings)
 
 

@@ -46,10 +46,23 @@ async def _get_browser() -> Browser:
         if _browser is None or not _browser.is_connected():
             if _playwright is None:
                 _playwright = await async_playwright().start()
-            _browser = await _playwright.chromium.launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
-            )
+            try:
+                _browser = await _playwright.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
+                )
+            except Exception:
+                # Browser binary missing — auto-install it then retry
+                logger.warning("Playwright browser not found — running 'playwright install chromium'...")
+                import subprocess, sys
+                subprocess.run(
+                    [sys.executable, "-m", "playwright", "install", "chromium"],
+                    check=True,
+                )
+                _browser = await _playwright.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
+                )
     return _browser
 
 
