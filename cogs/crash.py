@@ -13,10 +13,14 @@ class Crash(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+        self.crash_channel_id = None  # Set via /crashsetup command
+        self.live_message_id = None
         self.crash_loop.start()
+        self.update_live_embed.start()
         
     def cog_unload(self):
         self.crash_loop.cancel()
+        self.update_live_embed.cancel()
         
     @tasks.loop(seconds=1)
     async def crash_loop(self):
@@ -52,6 +56,77 @@ class Crash(commands.Cog):
             
     @crash_loop.before_loop
     async def before_crash_loop(self):
+        await self.bot.wait_until_ready()
+    
+    @tasks.loop(seconds=2)
+    async def update_live_embed(self):
+        """Update live embed in crash channel every 2 seconds"""
+        if not self.crash_channel_id or not self.live_message_id:
+            return
+            
+        try:
+            channel = self.bot.get_channel(self.crash_channel_id)
+            if not channel:
+                return
+                
+            # Get current game
+            result = self.supabase.table('crash_games').select('*').order('created_at', desc=True).limit(1).execute()
+            if not result.data:
+                return
+                
+            game = result.data[0]
+            
+            # Determine GIF and embed content based on phase
+            if game['status'] == 'betting':
+                gif_url = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcjZ0ZGQ2MzB2YzF2cjZ0ZGQ2MzB2YzF2/giphy.gif"  # Betting GIF
+                title = "🎰 Betting Phase"
+                description = "Place your bets now!\n\nGame starts soon..."
+                color = discord.Color.gold()
+            elif game['status'] == 'running':
+                started = datetime.fromisoformat(game['started_at'].replace('Z', '+00:00'))
+                elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+                current_mult = round(1.0 + (elapsed * 0.2), 2)
+                
+                supersonic = current_mult >= 5.0
+                
+                if supersonic:
+                    gif_url = "https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif"  # Supersonic GIF
+                    title = "🔥 SUPERSONIC MODE"
+                    color = discord.Color.orange()
+                else:
+                    gif_url = "https://media.giphy.com/media/xT8qBvH1pAhtfSx52U/giphy.gif"  # Flying rocket GIF
+                    title = "🚀 Crash Running"
+                    color = discord.Color.green()
+                    
+                description = f"**Current Multiplier: {current_mult}x**\n\nCash out with `/cashout`"
+            else:  # ended
+                gif_url = "https://media.giphy.com/media/l4FGpP4lxGGgK5CBW/giphy.gif"  # Crash/explosion GIF
+                title = "💥 CRASHED!"
+                description = f"Game crashed at **{game['crash_point']}x**\n\nNew game starting in 2s..."
+                color = discord.Color.red()
+                
+            embed = create_embed(title=title, description=description, color=color)
+            embed.set_image(url=gif_url)
+            
+            # Get bet count
+            bets = self.supabase.table('crash_bets').select('*', count='exact').eq('game_id', game['id']).execute()
+            bet_count = len(bets.data) if bets.data else 0
+            embed.set_footer(text=f"{bet_count} players betting")
+            
+            # Update message
+            try:
+                message = await channel.fetch_message(self.live_message_id)
+                await message.edit(embed=embed)
+            except discord.NotFound:
+                # Message deleted, create new one
+                new_msg = await channel.send(embed=embed)
+                self.live_message_id = new_msg.id
+                
+        except Exception as e:
+            print(f"Live embed update error: {e}")
+            
+    @update_live_embed.before_loop
+    async def before_update_live_embed(self):
         await self.bot.wait_until_ready()
         
     async def _start_new_game(self):
@@ -222,6 +297,27 @@ class Crash(commands.Cog):
         add_balance(user_id, winnings)
         
         await interaction.response.send_message(f"✅ Cashed out at {current_mult}x! Won {winnings} {COIN_EMOJI}", ephemeral=True)
+    
+    @app_commands.command(name="crashsetup", description="Setup crash game live channel")
+    @app_commands.default_permissions(administrator=True)
+    async def crash_setup(self, interaction: discord.Interaction, channel: discord.TextChannel):
+        """Admin command to set up live crash channel"""
+        self.crash_channel_id = channel.id
+        
+        # Create initial message
+        embed = create_embed(
+            title="🚀 Crash Game Live",
+            description="This message will update every 2 seconds with the current game status.",
+            color=discord.Color.blurple()
+        )
+        
+        msg = await channel.send(embed=embed)
+        self.live_message_id = msg.id
+        
+        await interaction.response.send_message(
+            f"✅ Crash live channel set to {channel.mention}\nMessage ID: {msg.id}",
+            ephemeral=True
+        )
 
 async def setup(bot):
     await bot.add_cog(Crash(bot))
