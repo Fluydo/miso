@@ -137,6 +137,16 @@ class MisoBot(commands.Bot):
         )
         await self.change_presence(status=discord.Status.online, activity=activity)
 
+        # Start Supabase giveaway poller for bidirectional sync
+        if config.SUPABASE_SERVICE_KEY and config.SUPABASE_URL:
+            from functions.supabase_poller import GiveawayPoller
+            if not hasattr(self, 'giveaway_poller'):
+                self.giveaway_poller = GiveawayPoller(self)
+                await self.giveaway_poller.start()
+                logger.info("Started Supabase giveaway poller")
+        else:
+            logger.warning("SUPABASE_SERVICE_KEY not set, skipping giveaway poller")
+
     @commands.command(name="sync")
     @commands.is_owner()
     async def sync_commands(self, ctx: commands.Context) -> None:

@@ -26,15 +26,32 @@ from discord import app_commands
 from discord.ext import commands
 
 import config
-from functions.economy import (
-    add_balance,
-    claim_daily,
-    get_balance,
-    get_rich_leaderboard,
-    record_game_result,
-    remove_balance,
-    transfer_coins,
-)
+
+# Import async Supabase economy functions
+from functions import economy_supabase
+
+# Create sync wrappers for backward compatibility
+def get_balance(user_id: int) -> int:
+    return asyncio.run(economy_supabase.get_balance(user_id))
+
+def add_balance(user_id: int, amount: int) -> int:
+    return asyncio.run(economy_supabase.add_balance(user_id, amount))
+
+def remove_balance(user_id: int, amount: int) -> bool:
+    return asyncio.run(economy_supabase.remove_balance(user_id, amount))
+
+def record_game_result(user_id: int, won: bool, profit_or_loss: int) -> None:
+    asyncio.run(economy_supabase.record_game_result(user_id, won, profit_or_loss))
+
+def claim_daily(user_id: int) -> tuple[bool, int, str | None]:
+    return asyncio.run(economy_supabase.claim_daily(user_id))
+
+def transfer_coins(sender_id: int, receiver_id: int, amount: int) -> tuple[bool, str]:
+    return asyncio.run(economy_supabase.transfer_coins(sender_id, receiver_id, amount))
+
+def get_rich_leaderboard(limit: int = 10) -> list[dict]:
+    return asyncio.run(economy_supabase.get_rich_leaderboard(limit))
+
 from functions.renderer import (
     render_blackjack_table,
     render_coinflip_card,
