@@ -30,27 +30,49 @@ import config
 # Import async Supabase economy functions
 from functions import economy_supabase
 
-# Create sync wrappers for backward compatibility
-def get_balance(user_id: int) -> int:
-    return asyncio.run(economy_supabase.get_balance(user_id))
+# Sync wrappers using create_task for fire-and-forget (used in button callbacks)
+def get_balance_sync(user_id: int) -> int:
+    """Sync wrapper - blocks until result is available"""
+    import asyncio
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(economy_supabase.get_balance(user_id))
 
-def add_balance(user_id: int, amount: int) -> int:
-    return asyncio.run(economy_supabase.add_balance(user_id, amount))
+def add_balance_sync(user_id: int, amount: int) -> int:
+    import asyncio
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(economy_supabase.add_balance(user_id, amount))
 
-def remove_balance(user_id: int, amount: int) -> bool:
-    return asyncio.run(economy_supabase.remove_balance(user_id, amount))
+def remove_balance_sync(user_id: int, amount: int) -> bool:
+    import asyncio
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(economy_supabase.remove_balance(user_id, amount))
 
-def record_game_result(user_id: int, won: bool, profit_or_loss: int) -> None:
-    asyncio.run(economy_supabase.record_game_result(user_id, won, profit_or_loss))
+def record_game_result_sync(user_id: int, won: bool, profit_or_loss: int) -> None:
+    import asyncio
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(economy_supabase.record_game_result(user_id, won, profit_or_loss))
 
-def claim_daily(user_id: int) -> tuple[bool, int, str | None]:
-    return asyncio.run(economy_supabase.claim_daily(user_id))
+# For game commands, use async versions
+async def get_balance(user_id: int) -> int:
+    return await economy_supabase.get_balance(user_id)
 
-def transfer_coins(sender_id: int, receiver_id: int, amount: int) -> tuple[bool, str]:
-    return asyncio.run(economy_supabase.transfer_coins(sender_id, receiver_id, amount))
+async def add_balance(user_id: int, amount: int) -> int:
+    return await economy_supabase.add_balance(user_id, amount)
 
-def get_rich_leaderboard(limit: int = 10) -> list[dict]:
-    return asyncio.run(economy_supabase.get_rich_leaderboard(limit))
+async def remove_balance(user_id: int, amount: int) -> bool:
+    return await economy_supabase.remove_balance(user_id, amount)
+
+async def record_game_result(user_id: int, won: bool, profit_or_loss: int) -> None:
+    await economy_supabase.record_game_result(user_id, won, profit_or_loss)
+
+async def claim_daily(user_id: int) -> tuple[bool, int, str | None]:
+    return await economy_supabase.claim_daily(user_id)
+
+async def transfer_coins(sender_id: int, receiver_id: int, amount: int) -> tuple[bool, str]:
+    return await economy_supabase.transfer_coins(sender_id, receiver_id, amount)
+
+async def get_rich_leaderboard(limit: int = 10) -> list[dict]:
+    return await economy_supabase.get_rich_leaderboard(limit)
 
 from functions.renderer import (
     render_blackjack_table,
@@ -204,7 +226,7 @@ class MinesGameView(discord.ui.View):
             for item in self.children:
                 item.disabled = True
 
-            record_game_result(self.player_id, won=False, profit_or_loss=-self.bet)
+            await record_game_result(self.player_id, won=False, profit_or_loss=-self.bet)
 
             await interaction.response.defer()
             file = await self.get_rendered_image_file()
@@ -276,8 +298,8 @@ class MinesGameView(discord.ui.View):
 
         payout = self.current_payout()
         profit = self.current_profit()
-        add_balance(self.player_id, payout)
-        record_game_result(self.player_id, won=True, profit_or_loss=profit)
+        await add_balance(self.player_id, payout)
+        await record_game_result(self.player_id, won=True, profit_or_loss=profit)
 
         for i in range(self.total_tiles):
             if i in self.bomb_indices:
@@ -431,16 +453,16 @@ class BlackjackView(discord.ui.View):
         if outcome in ["win", "dealer_bust"]:
             payout = self.bet * 2
             profit = self.bet
-            add_balance(self.player_id, payout)
-            record_game_result(self.player_id, won=True, profit_or_loss=profit)
+            await add_balance(self.player_id, payout)
+            await record_game_result(self.player_id, won=True, profit_or_loss=profit)
             desc = f"🎉 **You Won!** +{payout} {config.EMOJI_COIN} (`+{profit}` profit)\nYour: `{p_score}` vs Dealer: `{d_score}`"
             color = config.COLOR_SUCCESS
         elif outcome == "push":
-            add_balance(self.player_id, self.bet)
+            await add_balance(self.player_id, self.bet)
             desc = f"🤝 **Push (Tie)!** Your `{self.bet}` {config.EMOJI_COIN} was returned.\nBoth scored `{p_score}`."
             color = config.COLOR_WARNING
         else:
-            record_game_result(self.player_id, won=False, profit_or_loss=-self.bet)
+            await record_game_result(self.player_id, won=False, profit_or_loss=-self.bet)
             desc = f"💥 **You Lost!** -{self.bet} {config.EMOJI_COIN}\nYour: `{p_score}` vs Dealer: `{d_score}`"
             color = config.COLOR_ERROR
 
@@ -454,7 +476,7 @@ class BlackjackView(discord.ui.View):
             color=color,
         )
         embed.set_image(url="attachment://blackjack.png")
-        embed.set_footer(text=f"Bet: {self.bet} • Balance: {get_balance(self.player_id)}")
+        embed.set_footer(text=f"Bet: {self.bet} • Balance: {get_balance_sync(self.player_id)}")
 
         await interaction.followup.edit_message(
             message_id=interaction.message.id,
@@ -562,7 +584,7 @@ class TowerClimberView(discord.ui.View):
             for item in self.children:
                 item.disabled = True
 
-            record_game_result(self.player_id, won=False, profit_or_loss=-self.bet)
+            await record_game_result(self.player_id, won=False, profit_or_loss=-self.bet)
 
             await interaction.response.defer()
             file = await self.get_rendered_board()
@@ -627,8 +649,8 @@ class TowerClimberView(discord.ui.View):
 
         payout = self.current_payout()
         profit = self.current_profit()
-        add_balance(self.player_id, payout)
-        record_game_result(self.player_id, won=True, profit_or_loss=profit)
+        await add_balance(self.player_id, payout)
+        await record_game_result(self.player_id, won=True, profit_or_loss=profit)
 
         for item in self.children:
             item.disabled = True
@@ -825,7 +847,7 @@ class Games(commands.Cog):
             )
             return
 
-        user_balance = get_balance(interaction.user.id)
+        user_balance = await get_balance(interaction.user.id)
         if user_balance < bet:
             await interaction.response.send_message(
                 f"{config.EMOJI_CROSS} You don't have enough coins! Balance: **{user_balance}** {config.EMOJI_COIN}",
@@ -833,7 +855,7 @@ class Games(commands.Cog):
             )
             return
 
-        remove_balance(interaction.user.id, bet)
+        await remove_balance(interaction.user.id, bet)
 
         game_view = MinesGameView(
             player_id=interaction.user.id,
@@ -872,7 +894,7 @@ class Games(commands.Cog):
             )
             return
 
-        balance = get_balance(interaction.user.id)
+        balance = await get_balance(interaction.user.id)
         if balance < bet:
             await interaction.response.send_message(
                 f"{config.EMOJI_CROSS} Insufficient balance! You have **{balance}** {config.EMOJI_COIN}",
@@ -880,7 +902,7 @@ class Games(commands.Cog):
             )
             return
 
-        remove_balance(interaction.user.id, bet)
+        await remove_balance(interaction.user.id, bet)
 
         bj_view = BlackjackView(player_id=interaction.user.id, bet=bet)
         await interaction.response.defer()
@@ -889,8 +911,8 @@ class Games(commands.Cog):
         if p_score == 21:
             payout = int(bet * 2.5)
             profit = payout - bet
-            add_balance(interaction.user.id, payout)
-            record_game_result(interaction.user.id, won=True, profit_or_loss=profit)
+            await add_balance(interaction.user.id, payout)
+            await record_game_result(interaction.user.id, won=True, profit_or_loss=profit)
 
             file = await bj_view.get_rendered_table(hide_dealer=False)
             embed = discord.Embed(
@@ -940,7 +962,7 @@ class Games(commands.Cog):
             )
             return
 
-        balance = get_balance(interaction.user.id)
+        balance = await get_balance(interaction.user.id)
         if balance < bet:
             await interaction.response.send_message(
                 f"{config.EMOJI_CROSS} Insufficient balance! You have **{balance}** {config.EMOJI_COIN}",
@@ -948,7 +970,7 @@ class Games(commands.Cog):
             )
             return
 
-        remove_balance(interaction.user.id, bet)
+        await remove_balance(interaction.user.id, bet)
         is_hard = (difficulty.value == "hard") if difficulty else False
 
         tower_view = TowerClimberView(player_id=interaction.user.id, bet=bet, is_hard=is_hard)
@@ -990,7 +1012,7 @@ class Games(commands.Cog):
             )
             return
 
-        balance = get_balance(interaction.user.id)
+        balance = await get_balance(interaction.user.id)
         if balance < bet:
             await interaction.response.send_message(
                 f"{config.EMOJI_CROSS} Insufficient balance! You have **{balance}** {config.EMOJI_COIN}",
@@ -1009,7 +1031,7 @@ class Games(commands.Cog):
             )
             return
 
-        remove_balance(interaction.user.id, bet)
+        await remove_balance(interaction.user.id, bet)
 
         # Spin wheel (0 to 36)
         landed_number = random.randint(0, 36)
@@ -1039,12 +1061,12 @@ class Games(commands.Cog):
         profit = payout - bet
 
         if won:
-            add_balance(interaction.user.id, payout)
-            record_game_result(interaction.user.id, won=True, profit_or_loss=profit)
+            await add_balance(interaction.user.id, payout)
+            await record_game_result(interaction.user.id, won=True, profit_or_loss=profit)
             payout_text = f"🎉 WON +{payout} coins (+{profit})"
             color = config.COLOR_SUCCESS
         else:
-            record_game_result(interaction.user.id, won=False, profit_or_loss=-bet)
+            await record_game_result(interaction.user.id, won=False, profit_or_loss=-bet)
             payout_text = f"💥 LOST -{bet} coins"
             color = config.COLOR_ERROR
 
@@ -1054,7 +1076,7 @@ class Games(commands.Cog):
 
         embed = discord.Embed(
             title="🎡 European Roulette",
-            description=f"**Bet:** `{bet}` {config.EMOJI_COIN} on **{space.upper()}**\n**New Balance:** `{get_balance(interaction.user.id):,}` {config.EMOJI_COIN}",
+            description=f"**Bet:** `{bet}` {config.EMOJI_COIN} on **{space.upper()}**\n**New Balance:** `{await get_balance(interaction.user.id):,}` {config.EMOJI_COIN}",
             color=color,
         )
         embed.set_image(url="attachment://roulette.png")
@@ -1075,7 +1097,7 @@ class Games(commands.Cog):
             )
             return
 
-        balance = get_balance(interaction.user.id)
+        balance = await get_balance(interaction.user.id)
         if balance < bet:
             await interaction.response.send_message(
                 f"{config.EMOJI_CROSS} Insufficient balance! You have **{balance}** {config.EMOJI_COIN}",
@@ -1083,7 +1105,7 @@ class Games(commands.Cog):
             )
             return
 
-        remove_balance(interaction.user.id, bet)
+        await remove_balance(interaction.user.id, bet)
 
         symbols = ["💎", "🍒", "🍋", "7️⃣", "🔔", "⭐"]
         weights = [15, 25, 25, 5, 15, 15]
@@ -1106,12 +1128,12 @@ class Games(commands.Cog):
         profit = payout - bet
 
         if won:
-            add_balance(interaction.user.id, payout)
-            record_game_result(interaction.user.id, won=True, profit_or_loss=profit)
+            await add_balance(interaction.user.id, payout)
+            await record_game_result(interaction.user.id, won=True, profit_or_loss=profit)
             desc = f"🎉 **You Won!** `{payout}` {config.EMOJI_COIN} (`+{profit}` profit)"
             color = config.COLOR_SUCCESS
         else:
-            record_game_result(interaction.user.id, won=False, profit_or_loss=-bet)
+            await record_game_result(interaction.user.id, won=False, profit_or_loss=-bet)
             desc = f"💥 **You Lost!** -{bet} {config.EMOJI_COIN}"
             color = config.COLOR_ERROR
 
@@ -1121,7 +1143,7 @@ class Games(commands.Cog):
 
         embed = discord.Embed(
             title="🎰 Slot Machine",
-            description=f"{desc}\n**Balance:** `{get_balance(interaction.user.id):,}` {config.EMOJI_COIN}",
+            description=f"{desc}\n**Balance:** `{await get_balance(interaction.user.id):,}` {config.EMOJI_COIN}",
             color=color,
         )
         embed.set_image(url="attachment://slots.png")
@@ -1153,7 +1175,7 @@ class Games(commands.Cog):
             )
             return
 
-        balance = get_balance(interaction.user.id)
+        balance = await get_balance(interaction.user.id)
         if balance < bet:
             await interaction.response.send_message(
                 f"{config.EMOJI_CROSS} Insufficient balance! You have **{balance}** {config.EMOJI_COIN}",
@@ -1161,19 +1183,19 @@ class Games(commands.Cog):
             )
             return
 
-        remove_balance(interaction.user.id, bet)
+        await remove_balance(interaction.user.id, bet)
         outcome = random.choice(["heads", "tails"])
         won = outcome == choice.value
         payout = bet * 2 if won else 0
         profit = bet if won else -bet
 
         if won:
-            add_balance(interaction.user.id, payout)
-            record_game_result(interaction.user.id, won=True, profit_or_loss=profit)
+            await add_balance(interaction.user.id, payout)
+            await record_game_result(interaction.user.id, won=True, profit_or_loss=profit)
             desc = f"🎉 **You Won!** +{payout} {config.EMOJI_COIN} (`+{bet}` profit)"
             color = config.COLOR_SUCCESS
         else:
-            record_game_result(interaction.user.id, won=False, profit_or_loss=-bet)
+            await record_game_result(interaction.user.id, won=False, profit_or_loss=-bet)
             desc = f"💥 **You Lost!** -{bet} {config.EMOJI_COIN}"
             color = config.COLOR_ERROR
 
@@ -1183,7 +1205,7 @@ class Games(commands.Cog):
 
         embed = discord.Embed(
             title=f"{config.EMOJI_COIN} Coinflip ({choice.name})",
-            description=f"{desc}\n**Balance:** `{get_balance(interaction.user.id):,}` {config.EMOJI_COIN}",
+            description=f"{desc}\n**Balance:** `{await get_balance(interaction.user.id):,}` {config.EMOJI_COIN}",
             color=color,
         )
         embed.set_image(url="attachment://coinflip.png")
@@ -1196,7 +1218,7 @@ class Games(commands.Cog):
     # ==========================================
     @app_commands.command(name="richest", description="View the visual coin leaderboard with interactive pages.")
     async def richest(self, interaction: discord.Interaction) -> None:
-        leaderboard_data = get_rich_leaderboard(limit=50)
+        leaderboard_data = await get_rich_leaderboard(limit=50)
         if not leaderboard_data:
             await interaction.response.send_message(
                 "*No economy records found yet. Run `/daily` to get started!*",
@@ -1231,7 +1253,7 @@ class Games(commands.Cog):
         user: Optional[discord.User] = None,
     ) -> None:
         target = user or interaction.user
-        bal = get_balance(target.id)
+        bal = await get_balance(target.id)
 
         embed = discord.Embed(
             title=f"{config.EMOJI_COIN} Coin Balance",
@@ -1247,10 +1269,10 @@ class Games(commands.Cog):
     # ==========================================
     @app_commands.command(name="daily", description="Claim your daily coins reward and build your streak!")
     async def daily(self, interaction: discord.Interaction) -> None:
-        success, amount, msg = claim_daily(interaction.user.id)
+        success, amount, msg = await claim_daily(interaction.user.id)
 
         if success:
-            new_bal = get_balance(interaction.user.id)
+            new_bal = await get_balance(interaction.user.id)
             embed = discord.Embed(
                 title="🎁 Daily Reward Claimed!",
                 description=(
@@ -1281,13 +1303,13 @@ class Games(commands.Cog):
         user: discord.User,
         amount: int,
     ) -> None:
-        success, message = transfer_coins(interaction.user.id, user.id, amount)
+        success, message = await transfer_coins(interaction.user.id, user.id, amount)
         if success:
             embed = discord.Embed(
                 description=(
                     f"{config.EMOJI_TICK} Successfully sent **{amount:,}** {config.EMOJI_COIN} "
                     f"to **<@{user.id}>**!\n"
-                    f"Your New Balance: **{get_balance(interaction.user.id):,}** {config.EMOJI_COIN}"
+                    f"Your New Balance: **{await get_balance(interaction.user.id):,}** {config.EMOJI_COIN}"
                 ),
                 color=config.COLOR_SUCCESS,
             )
