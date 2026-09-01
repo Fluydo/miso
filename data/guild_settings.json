@@ -1,5 +1,14 @@
 {
   "1543920075097251850": {
-    "mod_log_channel_id": 1543944865220399164
+    "mod_log_channel_id": 1543944865220399164,
+    "counting": {
+      "channel_id": 1544160227044233226,
+      "enabled": true,
+      "last_number": 0,
+      "last_user_id": null
+    },
+    "image_channels": [
+      1544160553600155678
+    ]
   }
 }

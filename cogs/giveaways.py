@@ -60,7 +60,7 @@ class GiveawayView(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(GiveawayJoinButton(message_id, count))
         self.add_item(discord.ui.Button(
-            label="Website: Click Me!",
+            label="Website",
             style=discord.ButtonStyle.link,
             emoji="🌐",
             url=f"{WEBSITE_URL}/giveaways/{message_id}",

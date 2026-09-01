@@ -124,6 +124,23 @@ class Utility(commands.Cog):
         view = HelpView(self.bot)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
+    @app_commands.command(name="website", description="Visit the Miso Hub dashboard to manage giveaways, play games, and more!")
+    async def website(self, interaction: discord.Interaction) -> None:
+        embed = discord.Embed(
+            title="🌐 Miso Hub Dashboard",
+            description=(
+                f"**Visit our web dashboard to:**\n"
+                f"{config.EMOJI_CHEVRON_RIGHT} View and enter giveaways\n"
+                f"{config.EMOJI_CHEVRON_RIGHT} Play casino games (Slots, Roulette, Crash)\n"
+                f"{config.EMOJI_CHEVRON_RIGHT} Check leaderboards and your stats\n"
+                f"{config.EMOJI_CHEVRON_RIGHT} Manage your profile and coins\n\n"
+                f"**[Click here to open Miso Hub →](https://miso-dashboard-iota.vercel.app/)**"
+            ),
+            color=config.COLOR_PRIMARY,
+        )
+        embed.set_footer(text=f"{config.BOT_NAME} Web Dashboard")
+        await interaction.response.send_message(embed=embed)
+
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Utility(bot))

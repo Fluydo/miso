@@ -1074,9 +1074,10 @@ class Games(commands.Cog):
         png_bytes = await render_roulette_card(landed_number, landed_color, won, payout_text)
         file = discord.File(io.BytesIO(png_bytes), filename="roulette.png")
 
+        new_balance = await get_balance(interaction.user.id)
         embed = discord.Embed(
             title="🎡 European Roulette",
-            description=f"**Bet:** `{bet}` {config.EMOJI_COIN} on **{space.upper()}**\n**New Balance:** `{await get_balance(interaction.user.id):,}` {config.EMOJI_COIN}",
+            description=f"**Bet:** `{bet}` {config.EMOJI_COIN} on **{space.upper()}**\n**New Balance:** `{new_balance:,}` {config.EMOJI_COIN}",
             color=color,
         )
         embed.set_image(url="attachment://roulette.png")
@@ -1141,9 +1142,10 @@ class Games(commands.Cog):
         png_bytes = await render_slots_machine(reels)
         file = discord.File(io.BytesIO(png_bytes), filename="slots.png")
 
+        new_balance = await get_balance(interaction.user.id)
         embed = discord.Embed(
             title="🎰 Slot Machine",
-            description=f"{desc}\n**Balance:** `{await get_balance(interaction.user.id):,}` {config.EMOJI_COIN}",
+            description=f"{desc}\n**Balance:** `{new_balance:,}` {config.EMOJI_COIN}",
             color=color,
         )
         embed.set_image(url="attachment://slots.png")
@@ -1203,9 +1205,10 @@ class Games(commands.Cog):
         png_bytes = await render_coinflip_card(outcome, won, bet, payout)
         file = discord.File(io.BytesIO(png_bytes), filename="coinflip.png")
 
+        new_balance = await get_balance(interaction.user.id)
         embed = discord.Embed(
             title=f"{config.EMOJI_COIN} Coinflip ({choice.name})",
-            description=f"{desc}\n**Balance:** `{await get_balance(interaction.user.id):,}` {config.EMOJI_COIN}",
+            description=f"{desc}\n**Balance:** `{new_balance:,}` {config.EMOJI_COIN}",
             color=color,
         )
         embed.set_image(url="attachment://coinflip.png")
@@ -1305,11 +1308,12 @@ class Games(commands.Cog):
     ) -> None:
         success, message = await transfer_coins(interaction.user.id, user.id, amount)
         if success:
+            new_balance = await get_balance(interaction.user.id)
             embed = discord.Embed(
                 description=(
                     f"{config.EMOJI_TICK} Successfully sent **{amount:,}** {config.EMOJI_COIN} "
                     f"to **<@{user.id}>**!\n"
-                    f"Your New Balance: **{await get_balance(interaction.user.id):,}** {config.EMOJI_COIN}"
+                    f"Your New Balance: **{new_balance:,}** {config.EMOJI_COIN}"
                 ),
                 color=config.COLOR_SUCCESS,
             )
@@ -1320,6 +1324,109 @@ class Games(commands.Cog):
                 color=config.COLOR_ERROR,
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    # ==========================================
+    # ADMIN COMMANDS
+    # ==========================================
+    @app_commands.command(name="give", description="[ADMIN] Give coins to a user.")
+    @app_commands.describe(user="The user to give coins to", amount="Amount of coins to give")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def give(
+        self,
+        interaction: discord.Interaction,
+        user: discord.User,
+        amount: int,
+    ) -> None:
+        if amount <= 0:
+            await interaction.response.send_message(
+                f"{config.EMOJI_CROSS} Amount must be positive!",
+                ephemeral=True,
+            )
+            return
+
+        new_balance = await add_balance(user.id, amount)
+        embed = discord.Embed(
+            description=(
+                f"{config.EMOJI_TICK} Gave **{amount:,}** {config.EMOJI_COIN} to **<@{user.id}>**\n"
+                f"Their New Balance: **{new_balance:,}** {config.EMOJI_COIN}"
+            ),
+            color=config.COLOR_SUCCESS,
+        )
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="take", description="[ADMIN] Take coins from a user.")
+    @app_commands.describe(user="The user to take coins from", amount="Amount of coins to take")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def take(
+        self,
+        interaction: discord.Interaction,
+        user: discord.User,
+        amount: int,
+    ) -> None:
+        if amount <= 0:
+            await interaction.response.send_message(
+                f"{config.EMOJI_CROSS} Amount must be positive!",
+                ephemeral=True,
+            )
+            return
+
+        current_balance = await get_balance(user.id)
+        if current_balance < amount:
+            await interaction.response.send_message(
+                f"{config.EMOJI_CROSS} User only has **{current_balance:,}** {config.EMOJI_COIN} coins!",
+                ephemeral=True,
+            )
+            return
+
+        success = await remove_balance(user.id, amount)
+        if success:
+            new_balance = await get_balance(user.id)
+            embed = discord.Embed(
+                description=(
+                    f"{config.EMOJI_TICK} Took **{amount:,}** {config.EMOJI_COIN} from **<@{user.id}>**\n"
+                    f"Their New Balance: **{new_balance:,}** {config.EMOJI_COIN}"
+                ),
+                color=config.COLOR_SUCCESS,
+            )
+            await interaction.response.send_message(embed=embed)
+        else:
+            await interaction.response.send_message(
+                f"{config.EMOJI_CROSS} Failed to take coins.",
+                ephemeral=True,
+            )
+
+    @app_commands.command(name="setcoins", description="[ADMIN] Set a user's coin balance to a specific amount.")
+    @app_commands.describe(user="The user to set coins for", amount="New coin balance")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def setcoins(
+        self,
+        interaction: discord.Interaction,
+        user: discord.User,
+        amount: int,
+    ) -> None:
+        if amount < 0:
+            await interaction.response.send_message(
+                f"{config.EMOJI_CROSS} Amount cannot be negative!",
+                ephemeral=True,
+            )
+            return
+
+        current_balance = await get_balance(user.id)
+        delta = amount - current_balance
+
+        if delta > 0:
+            await add_balance(user.id, delta)
+        elif delta < 0:
+            await remove_balance(user.id, abs(delta))
+
+        embed = discord.Embed(
+            description=(
+                f"{config.EMOJI_TICK} Set **<@{user.id}>**'s balance to **{amount:,}** {config.EMOJI_COIN}\n"
+                f"Previous Balance: **{current_balance:,}** {config.EMOJI_COIN}"
+            ),
+            color=config.COLOR_SUCCESS,
+        )
+        await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot: commands.Bot) -> None:
