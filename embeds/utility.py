@@ -201,3 +201,20 @@ def bot_info_embed(bot: discord.Client, uptime_seconds: float) -> discord.Embed:
 
     embed.set_footer(text=f"{config.BOT_NAME} Information")
     return embed
+
+
+def create_embed(
+    title: str = "",
+    description: str = "",
+    color: discord.Color = None
+) -> discord.Embed:
+    """Simple helper to create a basic embed with title, description, and optional color."""
+    if color is None:
+        color = config.COLOR_PRIMARY
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=color,
+        timestamp=datetime.now(timezone.utc)
+    )
+    return embed
