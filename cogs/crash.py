@@ -6,7 +6,7 @@ import random
 from datetime import datetime, timezone
 from functions.economy import get_balance, add_balance, remove_balance
 from embeds.utility import create_embed
-from config import COIN_EMOJI, SUPABASE_URL, SUPABASE_SERVICE_KEY
+from config import EMOJI_COIN, SUPABASE_URL, SUPABASE_SERVICE_KEY
 from supabase import create_client, Client
 
 class Crash(commands.Cog):
@@ -209,12 +209,12 @@ class Crash(commands.Cog):
         user_id = interaction.user.id
         
         if amount < 10:
-            await interaction.response.send_message(f"❌ Minimum bet is 10 {COIN_EMOJI}", ephemeral=True)
+            await interaction.response.send_message(f"❌ Minimum bet is 10 {EMOJI_COIN}", ephemeral=True)
             return
             
         balance = get_balance(user_id)
         if balance < amount:
-            await interaction.response.send_message(f"❌ Insufficient balance! You have {balance} {COIN_EMOJI}", ephemeral=True)
+            await interaction.response.send_message(f"❌ Insufficient balance! You have {balance} {EMOJI_COIN}", ephemeral=True)
             return
             
         # Get current game
@@ -246,7 +246,7 @@ class Crash(commands.Cog):
             'cashout_multiplier': None
         }).execute()
         
-        await interaction.response.send_message(f"✅ Bet placed: {amount} {COIN_EMOJI}", ephemeral=True)
+        await interaction.response.send_message(f"✅ Bet placed: {amount} {EMOJI_COIN}", ephemeral=True)
         
     @app_commands.command(name="cashout", description="Cash out of the crash game")
     async def crash_cashout(self, interaction: discord.Interaction):
@@ -296,7 +296,7 @@ class Crash(commands.Cog):
         
         add_balance(user_id, winnings)
         
-        await interaction.response.send_message(f"✅ Cashed out at {current_mult}x! Won {winnings} {COIN_EMOJI}", ephemeral=True)
+        await interaction.response.send_message(f"✅ Cashed out at {current_mult}x! Won {winnings} {EMOJI_COIN}", ephemeral=True)
     
     @app_commands.command(name="crashsetup", description="Setup crash game live channel")
     @app_commands.default_permissions(administrator=True)
