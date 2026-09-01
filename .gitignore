@@ -4,3 +4,13 @@ __pycache__/
 venv/
 .venv/
 data/guild_settings.json
+data/invites.json
+data/economy.json
+data/tempbans.json
+data/warnings.json
+data/levels.json
+data/giveaways.json
+data/tickets.json
+data/verification.json
+data/welcome.json
+data/antinuke.json
