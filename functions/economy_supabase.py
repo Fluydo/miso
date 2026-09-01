@@ -48,22 +48,18 @@ async def set_balance(user_id: int, amount: int) -> bool:
         "apikey": config.SUPABASE_SERVICE_KEY,
         "Authorization": f"Bearer {config.SUPABASE_SERVICE_KEY}",
         "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates",
     }
 
-    # Upsert user with new balance
-    payload = {
-        "discord_id": str(user_id),
-        "coins": max(0, amount),  # Never negative
-    }
+    # Update existing user's balance
+    payload = {"coins": max(0, amount)}
 
     async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.post(
-            f"{config.SUPABASE_URL}/rest/v1/users",
+        resp = await client.patch(
+            f"{config.SUPABASE_URL}/rest/v1/users?discord_id=eq.{user_id}",
             json=payload,
             headers=headers,
         )
-        return resp.status_code in (200, 201)
+        return resp.status_code in (200, 204)
 
 
 async def add_balance(user_id: int, amount: int) -> int:
