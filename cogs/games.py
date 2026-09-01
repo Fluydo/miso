@@ -1344,6 +1344,7 @@ class Games(commands.Cog):
             )
             return
 
+        await interaction.response.defer()
         new_balance = await add_balance(user.id, amount)
         embed = discord.Embed(
             description=(
@@ -1352,7 +1353,7 @@ class Games(commands.Cog):
             ),
             color=config.COLOR_SUCCESS,
         )
-        await interaction.response.send_message(embed=embed)
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="take", description="[ADMIN] Take coins from a user.")
     @app_commands.describe(user="The user to take coins from", amount="Amount of coins to take")
@@ -1370,9 +1371,10 @@ class Games(commands.Cog):
             )
             return
 
+        await interaction.response.defer()
         current_balance = await get_balance(user.id)
         if current_balance < amount:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} User only has **{current_balance:,}** {config.EMOJI_COIN} coins!",
                 ephemeral=True,
             )
@@ -1388,9 +1390,9 @@ class Games(commands.Cog):
                 ),
                 color=config.COLOR_SUCCESS,
             )
-            await interaction.response.send_message(embed=embed)
+            await interaction.followup.send(embed=embed)
         else:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Failed to take coins.",
                 ephemeral=True,
             )
@@ -1411,22 +1413,27 @@ class Games(commands.Cog):
             )
             return
 
+        await interaction.response.defer()
         current_balance = await get_balance(user.id)
-        delta = amount - current_balance
-
-        if delta > 0:
-            await add_balance(user.id, delta)
-        elif delta < 0:
-            await remove_balance(user.id, abs(delta))
-
-        embed = discord.Embed(
-            description=(
-                f"{config.EMOJI_TICK} Set **<@{user.id}>**'s balance to **{amount:,}** {config.EMOJI_COIN}\n"
-                f"Previous Balance: **{current_balance:,}** {config.EMOJI_COIN}"
-            ),
-            color=config.COLOR_SUCCESS,
-        )
-        await interaction.response.send_message(embed=embed)
+        
+        # Use set_balance from economy_supabase
+        from functions.economy_supabase import set_balance
+        success = await set_balance(user.id, amount)
+        
+        if success:
+            embed = discord.Embed(
+                description=(
+                    f"{config.EMOJI_TICK} Set **<@{user.id}>**'s balance to **{amount:,}** {config.EMOJI_COIN}\n"
+                    f"Previous Balance: **{current_balance:,}** {config.EMOJI_COIN}"
+                ),
+                color=config.COLOR_SUCCESS,
+            )
+            await interaction.followup.send(embed=embed)
+        else:
+            await interaction.followup.send(
+                f"{config.EMOJI_CROSS} Failed to set balance.",
+                ephemeral=True,
+            )
 
 
 async def setup(bot: commands.Bot) -> None:
