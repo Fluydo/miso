@@ -68,8 +68,16 @@ class GiveawayPoller:
 
             for giveaway in giveaways:
                 message_id = giveaway["message_id"]
-                guild_id = int(giveaway["guild_id"])
-                channel_id = int(giveaway["channel_id"])
+                guild_id = giveaway.get("guild_id")
+                channel_id = giveaway.get("channel_id")
+                
+                # Skip if critical fields are missing
+                if not guild_id or not channel_id or not message_id:
+                    logger.warning(f"Skipping giveaway with missing fields: {giveaway}")
+                    continue
+                    
+                guild_id = int(guild_id)
+                channel_id = int(channel_id)
                 giveaway_id = giveaway["id"]
 
                 # Get entries from Supabase
