@@ -140,8 +140,16 @@ class Verification(commands.Cog):
         settings = get_verification_settings(interaction.guild.id)
         exceptions = set(settings.get("exception_channel_ids", []))
 
+        # Send quick confirmation first
+        await interaction.followup.send(
+            f"{config.EMOJI_INFO} Setting up verification... This may take a moment for large servers.",
+            ephemeral=True
+        )
+
         # Auto-configure permission overwrites across all channels
         everyone_role = interaction.guild.default_role
+        success_count = 0
+        failed_count = 0
 
         for ch in interaction.guild.channels:
             try:
@@ -186,7 +194,13 @@ class Verification(commands.Cog):
                         view_channel=True,
                         reason="Verification Setup",
                     )
+                success_count += 1
             except discord.Forbidden:
+                failed_count += 1
+                continue
+            except Exception as e:
+                logger.error(f"Error setting permissions for channel {ch.id}: {e}")
+                failed_count += 1
                 continue
 
         # Send Verification Panel (Components V2 style)
@@ -204,11 +218,15 @@ class Verification(commands.Cog):
         view = VerifyPanelView()
         await channel.send(embed=panel_embed, view=view)
 
-        await interaction.followup.send(
+        # Send final status
+        status_msg = (
             f"{config.EMOJI_TICK} Verification panel deployed to {channel.mention}!\n"
-            f"Server permissions have been locked down for `@everyone` and unlocked for `{verified_role.name}`.",
-            ephemeral=True,
+            f"Configured {success_count} channels successfully."
         )
+        if failed_count > 0:
+            status_msg += f"\n⚠️ Failed to configure {failed_count} channels (check bot permissions)."
+            
+        await interaction.edit_original_response(content=status_msg)
 
     exception_group = app_commands.Group(
         name="exception",
