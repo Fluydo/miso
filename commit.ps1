@@ -4,18 +4,16 @@ Write-Host "🔄 Staging changes..." -ForegroundColor Cyan
 git add .
 
 Write-Host "📝 Committing..." -ForegroundColor Cyan
-git commit -m "feat: exponential crash curve, transparent UI, real-time updates
+git commit -m "fix: crash game auto-restart and mobile responsiveness
 
-- Add TRUE exponential curve (1.08^t formula)
-- Transparent background like log embeds  
-- Light gray grid + Poppins font
-- Fix text overlap issues
-- Add bet results table PNG
-- Fix website real-time subscription
-- Better error handling on bet/cashout
-- Force refresh after actions"
+- Fix game loop to handle 'ended' status and restart automatically
+- Game now properly cycles: betting → running → ended → new game
+- Add mobile responsiveness to crash page
+- Graph now visible on mobile devices
+- Responsive text sizes and padding
+- Better error logging with traceback"
 
-Write-Host "🚀 Force pushing to origin main..." -ForegroundColor Cyan
+Write-Host "🚀 Pushing to origin main..." -ForegroundColor Cyan
 git push origin main --force
 
 Write-Host "✅ Done!" -ForegroundColor Green

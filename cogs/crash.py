@@ -216,13 +216,24 @@ class Crash(commands.Cog):
                     await self._start_crash(game['id'])
             elif game['status'] == 'running':
                 # Crash is running, check if it should end
-                if elapsed >= game['crash_at'] + 10:
-                    # End game and start new one
+                started = datetime.fromisoformat(game['started_at'].replace('Z', '+00:00'))
+                running_elapsed = (now - started).total_seconds()
+                
+                # Check if crash point is reached
+                if running_elapsed >= game['crash_at']:
+                    # End game
                     await self._end_game(game['id'])
-                    await asyncio.sleep(2)
+            elif game['status'] == 'ended':
+                # Game ended, wait 2 seconds then start new one
+                ended = datetime.fromisoformat(game['ended_at'].replace('Z', '+00:00')) if game.get('ended_at') else created
+                ended_elapsed = (now - ended).total_seconds()
+                
+                if ended_elapsed >= 2:
                     await self._start_new_game()
         except Exception as e:
             print(f"Crash loop error: {e}")
+            import traceback
+            traceback.print_exc()
             
     @crash_loop.before_loop
     async def before_crash_loop(self):
