@@ -849,7 +849,22 @@ class Moderation(commands.Cog):
         )
         if file:
             log_embed.set_image(url="attachment://purged_messages.png")
-        await send_mod_log(interaction.guild, log_embed, file=file, log_type="messages")
+        
+        # Collect embeds from deleted messages to show in the log (max 10 embeds total)
+        collected_embeds = []
+        for msg in deleted[:10]:  # Only first 10 messages to avoid hitting embed limit
+            if msg.embeds:
+                collected_embeds.extend(msg.embeds[:2])  # Max 2 embeds per message
+                if len(collected_embeds) >= 10:  # Discord limit is 10 embeds
+                    break
+        
+        await send_mod_log(
+            interaction.guild, 
+            log_embed, 
+            file=file, 
+            log_type="messages",
+            embeds=collected_embeds if collected_embeds else None
+        )
 
     # ==========================================
     # /unban

@@ -3,6 +3,7 @@ import discord
 from discord.ext import commands
 
 from functions.moderation import send_mod_log
+from functions.message_cache import cache_message, get_cached_message
 from embeds.logs import (
     create_message_delete_log_view,
     create_message_edit_log_view,
@@ -32,6 +33,15 @@ class Events(commands.Cog):
         self.bot = bot
 
     # ==========================================
+    # MESSAGE CACHING - Cache all messages for delete logs
+    # ==========================================
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message) -> None:
+        """Cache every message with its embeds, components, and attachments."""
+        if message.guild:
+            cache_message(message)
+
+    # ==========================================
     # MESSAGE EVENTS -> "messages" thread (Visual UI Images)
     # ==========================================
     @commands.Cog.listener()
@@ -45,7 +55,6 @@ class Events(commands.Cog):
             return
         
         # Check if message is cached (has content/author data)
-        # Uncached messages only have id, channel_id, guild_id
         if not message.author:
             logger.debug(f"Skipping delete log for uncached message {message.id}")
             return
@@ -53,14 +62,27 @@ class Events(commands.Cog):
         # Run in background
         async def send_log():
             try:
-                view, file, original_embeds = await create_message_delete_log_view(message)
-                # Send the log with the original embeds included
+                # Try to get cached message data first
+                cached = get_cached_message(message.guild.id, message.id)
+                
+                # If we have cached data, reconstruct the embeds from it
+                original_embeds = []
+                if cached and cached.get("embeds"):
+                    for embed_dict in cached["embeds"]:
+                        original_embeds.append(discord.Embed.from_dict(embed_dict))
+                elif message.embeds:
+                    # Fallback to message embeds if available
+                    original_embeds = message.embeds[:10]
+                
+                view, file, _ = await create_message_delete_log_view(message)
+                
+                # Send the log with the reconstructed embeds
                 await send_mod_log(
                     message.guild, 
                     log_type="messages", 
                     view=view, 
                     file=file,
-                    embeds=original_embeds  # Include the original embeds
+                    embeds=original_embeds if original_embeds else None
                 )
             except Exception as e:
                 logger.error(f"Error generating visual delete log: {e}", exc_info=True)
