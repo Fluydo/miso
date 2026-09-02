@@ -38,11 +38,16 @@ class Events(commands.Cog):
     async def on_message_delete(self, message: discord.Message) -> None:
         if not message.guild or message.author.bot:
             return
-        try:
-            view, file = await create_message_delete_log_view(message)
-            await send_mod_log(message.guild, log_type="messages", view=view, file=file)
-        except Exception as e:
-            logger.error(f"Error generating visual delete log: {e}", exc_info=True)
+        
+        # Run in background
+        async def send_log():
+            try:
+                view, file = await create_message_delete_log_view(message)
+                await send_mod_log(message.guild, log_type="messages", view=view, file=file)
+            except Exception as e:
+                logger.error(f"Error generating visual delete log: {e}", exc_info=True)
+        
+        self.bot.loop.create_task(send_log())
 
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
@@ -50,11 +55,16 @@ class Events(commands.Cog):
             return
         if before.content == after.content:
             return
-        try:
-            view, file = await create_message_edit_log_view(before, after)
-            await send_mod_log(before.guild, log_type="messages", view=view, file=file)
-        except Exception as e:
-            logger.error(f"Error generating visual edit log: {e}", exc_info=True)
+        
+        # Run in background
+        async def send_log():
+            try:
+                view, file = await create_message_edit_log_view(before, after)
+                await send_mod_log(before.guild, log_type="messages", view=view, file=file)
+            except Exception as e:
+                logger.error(f"Error generating visual edit log: {e}", exc_info=True)
+        
+        self.bot.loop.create_task(send_log())
 
     # ==========================================
     # MEMBER JOIN & LEAVE -> "members" thread
@@ -143,19 +153,27 @@ class Events(commands.Cog):
     # ==========================================
     @commands.Cog.listener()
     async def on_guild_channel_create(self, channel: discord.abc.GuildChannel) -> None:
-        try:
-            view, file = await create_channel_create_log_view(channel)
-            await send_mod_log(channel.guild, log_type="server", view=view, file=file)
-        except Exception as e:
-            logger.error(f"Error generating visual channel create log: {e}", exc_info=True)
+        # Run in background to not block other events
+        async def send_log():
+            try:
+                view, file = await create_channel_create_log_view(channel)
+                await send_mod_log(channel.guild, log_type="server", view=view, file=file)
+            except Exception as e:
+                logger.error(f"Error generating visual channel create log: {e}", exc_info=True)
+        
+        self.bot.loop.create_task(send_log())
 
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel) -> None:
-        try:
-            view, file = await create_channel_delete_log_view(channel)
-            await send_mod_log(channel.guild, log_type="server", view=view, file=file)
-        except Exception as e:
-            logger.error(f"Error generating visual channel delete log: {e}", exc_info=True)
+        # Run in background to not block other events
+        async def send_log():
+            try:
+                view, file = await create_channel_delete_log_view(channel)
+                await send_mod_log(channel.guild, log_type="server", view=view, file=file)
+            except Exception as e:
+                logger.error(f"Error generating visual channel delete log: {e}", exc_info=True)
+        
+        self.bot.loop.create_task(send_log())
 
     @commands.Cog.listener()
     async def on_guild_channel_update(
@@ -165,30 +183,42 @@ class Events(commands.Cog):
     ) -> None:
         # Channel Rename (Visual Discord Channel Pill)
         if before.name != after.name:
-            try:
-                view, file = await create_channel_update_log_view(after, before.name, after.name)
-                await send_mod_log(after.guild, log_type="server", view=view, file=file)
-            except Exception as e:
-                logger.error(f"Error generating visual channel update log: {e}", exc_info=True)
+            # Run in background to not block other events
+            async def send_log():
+                try:
+                    view, file = await create_channel_update_log_view(after, before.name, after.name)
+                    await send_mod_log(after.guild, log_type="server", view=view, file=file)
+                except Exception as e:
+                    logger.error(f"Error generating visual channel update log: {e}", exc_info=True)
+            
+            self.bot.loop.create_task(send_log())
 
     # ==========================================
     # ROLE EVENTS -> "server" thread (Visual UI Images)
     # ==========================================
     @commands.Cog.listener()
     async def on_guild_role_create(self, role: discord.Role) -> None:
-        try:
-            view, file = await create_role_create_log_view(role)
-            await send_mod_log(role.guild, log_type="server", view=view, file=file)
-        except Exception as e:
-            logger.error(f"Error generating visual role create log: {e}", exc_info=True)
+        # Run in background
+        async def send_log():
+            try:
+                view, file = await create_role_create_log_view(role)
+                await send_mod_log(role.guild, log_type="server", view=view, file=file)
+            except Exception as e:
+                logger.error(f"Error generating visual role create log: {e}", exc_info=True)
+        
+        self.bot.loop.create_task(send_log())
 
     @commands.Cog.listener()
     async def on_guild_role_delete(self, role: discord.Role) -> None:
-        try:
-            view, file = await create_role_delete_log_view(role)
-            await send_mod_log(role.guild, log_type="server", view=view, file=file)
-        except Exception as e:
-            logger.error(f"Error generating visual role delete log: {e}", exc_info=True)
+        # Run in background
+        async def send_log():
+            try:
+                view, file = await create_role_delete_log_view(role)
+                await send_mod_log(role.guild, log_type="server", view=view, file=file)
+            except Exception as e:
+                logger.error(f"Error generating visual role delete log: {e}", exc_info=True)
+        
+        self.bot.loop.create_task(send_log())
 
     @commands.Cog.listener()
     async def on_guild_role_update(self, before: discord.Role, after: discord.Role) -> None:
