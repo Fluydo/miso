@@ -776,6 +776,14 @@ class Moderation(commands.Cog):
         try:
             deleted = await channel.purge(limit=amount)
             count = len(deleted)
+            
+            # Mark these messages as bulk deleted to avoid duplicate individual delete logs
+            # Store message IDs in a set that the on_message_delete listener can check
+            if not hasattr(self.bot, '_bulk_deleted_messages'):
+                self.bot._bulk_deleted_messages = set()
+            for msg in deleted:
+                self.bot._bulk_deleted_messages.add(msg.id)
+            
         except discord.HTTPException as e:
             await interaction.followup.send(
                 embed=error_embed(f"Failed to clear messages: {e}"),
@@ -804,10 +812,24 @@ class Moderation(commands.Cog):
                             "avatar_url": ref.author.display_avatar.url,
                             "content": ref.content[:50] if ref.content else "[Attachment/Embed]",
                         }
+                    
+                    # Build content for display (handle embeds/attachments)
+                    content_parts = []
+                    if m.content:
+                        content_parts.append(m.content)
+                    if m.embeds:
+                        content_parts.append(f"[{len(m.embeds)} embed(s)]")
+                    if m.attachments:
+                        content_parts.append(f"[{len(m.attachments)} attachment(s)]")
+                    if m.components:
+                        content_parts.append("[Components V2]")
+                    
+                    display_content = " ".join(content_parts) if content_parts else "*Empty message*"
+                    
                     msg_list.append({
                         "author_name": getattr(m.author, "display_name", m.author.name),
                         "avatar_url": m.author.display_avatar.url,
-                        "content": m.content,
+                        "content": display_content,
                         "timestamp_str": m.created_at.strftime("Today at %I:%M %p"),
                         "is_bot": m.author.bot,
                         "replied_to": replied_to,

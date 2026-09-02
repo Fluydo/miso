@@ -39,6 +39,11 @@ class Events(commands.Cog):
         if not message.guild:
             return
         
+        # Skip if this message was bulk deleted (from /clear command)
+        if hasattr(self.bot, '_bulk_deleted_messages') and message.id in self.bot._bulk_deleted_messages:
+            self.bot._bulk_deleted_messages.discard(message.id)  # Remove from set
+            return
+        
         # Check if message is cached (has content/author data)
         # Uncached messages only have id, channel_id, guild_id
         if not message.author:
