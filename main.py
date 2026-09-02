@@ -174,6 +174,35 @@ def main() -> None:
         )
         sys.exit(1)
 
+    # Auto-install Node.js dependencies for GIF generation
+    logger.info("Checking Node.js dependencies...")
+    try:
+        import subprocess
+        node_modules = config.BASE_DIR / "node_modules"
+        package_json = config.BASE_DIR / "package.json"
+        
+        # Check if package.json exists and node_modules is missing or puppeteer is missing
+        if package_json.exists() and (not node_modules.exists() or not (node_modules / "puppeteer").exists()):
+            logger.info("Installing Node.js dependencies (puppeteer)...")
+            result = subprocess.run(
+                ["npm", "install"],
+                cwd=config.BASE_DIR,
+                capture_output=True,
+                text=True,
+                timeout=300  # 5 minutes timeout
+            )
+            
+            if result.returncode == 0:
+                logger.info("✅ Node.js dependencies installed successfully")
+            else:
+                logger.warning(f"⚠️ npm install failed (will use fallback renderer): {result.stderr}")
+        else:
+            logger.info("✅ Node.js dependencies already installed")
+    except FileNotFoundError:
+        logger.warning("⚠️ npm not found in PATH - install Node.js to enable advanced GIF rendering")
+    except Exception as e:
+        logger.warning(f"⚠️ Could not install Node.js dependencies: {e}")
+
     bot = MisoBot()
 
     try:
