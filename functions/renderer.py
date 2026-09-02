@@ -1825,3 +1825,569 @@ async def render_tower_board(
     </html>
     """
     return await _capture_html(doc)
+
+
+async def render_crash_frame(
+    phase: str,
+    multiplier: float = 1.0,
+    countdown: int = 10,
+    bet_list: list[dict] = None,
+) -> bytes:
+    """
+    Renders a crash game frame with rocket animation and bet list.
+    
+    Args:
+        phase: 'betting', 'running', 'supersonic', or 'crashed'
+        multiplier: Current multiplier (for running/supersonic phase)
+        countdown: Seconds remaining in betting phase
+        bet_list: List of bets [{'username': str, 'amount': int, 'status': str, 'multiplier': float}]
+    
+    Returns:
+        PNG bytes with transparent background
+    """
+    bet_list = bet_list or []
+    
+    # Rocket SVG with animation based on phase
+    if phase == 'betting':
+        # Rocket on launch pad with countdown
+        rocket_y = 280
+        rocket_rotation = 0
+        rocket_color = "#5865f2"
+        flame_opacity = 0.3
+        bg_gradient_start = "#2b2d31"
+        bg_gradient_end = "#1e1f22"
+        title_text = f"🎰 BETTING PHASE"
+        subtitle_text = f"Game starts in {countdown}s"
+        title_color = "#fee75c"
+    elif phase == 'running':
+        # Rocket flying upward
+        rocket_y = 150 - (multiplier * 10)  # Moves up as multiplier increases
+        rocket_rotation = -10
+        rocket_color = "#57f287"
+        flame_opacity = 0.8
+        bg_gradient_start = "#1e3a28"
+        bg_gradient_end = "#0f1e14"
+        title_text = f"🚀 FLYING"
+        subtitle_text = f"{multiplier:.2f}x"
+        title_color = "#57f287"
+    elif phase == 'supersonic':
+        # Rocket supersonic with orange glow
+        rocket_y = 80
+        rocket_rotation = -20
+        rocket_color = "#ff9500"
+        flame_opacity = 1.0
+        bg_gradient_start = "#3a2010"
+        bg_gradient_end = "#1e1008"
+        title_text = f"🔥 SUPERSONIC"
+        subtitle_text = f"{multiplier:.2f}x"
+        title_color = "#ff9500"
+    else:  # crashed
+        # Explosion effect
+        rocket_y = 200
+        rocket_rotation = 45
+        rocket_color = "#ed4245"
+        flame_opacity = 0
+        bg_gradient_start = "#3a1010"
+        bg_gradient_end = "#1e0808"
+        title_text = f"💥 CRASHED!"
+        subtitle_text = f"at {multiplier:.2f}x"
+        title_color = "#ed4245"
+    
+    # Generate bet list HTML
+    bet_rows_html = ""
+    for i, bet in enumerate(bet_list[:10]):  # Show top 10
+        username = _escape(bet.get('username', 'Unknown'))
+        amount = bet.get('amount', 0)
+        status = bet.get('status', 'active')
+        bet_mult = bet.get('multiplier', 0)
+        
+        if status == 'cashed_out':
+            status_html = f'<span style="color:#57f287;">✓ {bet_mult:.2f}x</span>'
+        elif status == 'lost':
+            status_html = f'<span style="color:#ed4245;">✗ Lost</span>'
+        else:
+            status_html = f'<span style="color:#fee75c;">⏳ Active</span>'
+        
+        bet_rows_html += f"""
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:rgba(255,255,255,0.03); border-radius:6px; margin-bottom:4px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="color:#949ba4; font-size:13px; font-weight:700; width:20px;">#{i+1}</span>
+                <span style="color:#dbdee1; font-size:14px; font-weight:600;">{username[:12]}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span style="color:#a240f7; font-size:14px; font-weight:700;">{amount:,}</span>
+                {status_html}
+            </div>
+        </div>
+        """
+    
+    if not bet_rows_html:
+        bet_rows_html = '<div style="text-align:center; color:#72767d; font-size:13px; padding:20px;">No bets yet</div>'
+    
+    # Rocket SVG graphic
+    rocket_svg = f"""
+    <svg width="80" height="120" viewBox="0 0 80 120" style="position:absolute; left:300px; top:{rocket_y}px; transform:rotate({rocket_rotation}deg); filter:drop-shadow(0 0 20px {rocket_color});">
+        <!-- Rocket body -->
+        <ellipse cx="40" cy="60" rx="18" ry="35" fill="{rocket_color}" opacity="0.9"/>
+        <ellipse cx="40" cy="45" rx="16" ry="25" fill="{rocket_color}"/>
+        
+        <!-- Rocket nose cone -->
+        <path d="M 40 10 L 25 35 L 55 35 Z" fill="{rocket_color}" stroke="#ffffff" stroke-width="1.5"/>
+        
+        <!-- Window -->
+        <circle cx="40" cy="40" r="8" fill="#1e1f22" opacity="0.8"/>
+        <circle cx="40" cy="40" r="6" fill="#5865f2" opacity="0.6"/>
+        
+        <!-- Fins -->
+        <path d="M 22 70 L 10 90 L 22 85 Z" fill="{rocket_color}" opacity="0.8"/>
+        <path d="M 58 70 L 70 90 L 58 85 Z" fill="{rocket_color}" opacity="0.8"/>
+        
+        <!-- Flame trail -->
+        <ellipse cx="40" cy="95" rx="12" ry="20" fill="#ff6b1a" opacity="{flame_opacity}"/>
+        <ellipse cx="40" cy="100" rx="8" ry="15" fill="#ffd700" opacity="{flame_opacity}"/>
+        <ellipse cx="40" cy="105" rx="5" ry="10" fill="#ffffff" opacity="{flame_opacity * 0.8}"/>
+    </svg>
+    """
+    
+    doc = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+        body {{
+            background: transparent;
+            font-family: 'Inter', 'gg sans', sans-serif;
+            color: #dbdee1;
+            padding: 20px;
+        }}
+        .crash-container {{
+            display: flex;
+            gap: 20px;
+            background: linear-gradient(135deg, {bg_gradient_start} 0%, {bg_gradient_end} 100%);
+            border: 2px solid rgba(255,255,255,0.08);
+            border-radius: 20px;
+            padding: 24px;
+            min-width: 800px;
+        }}
+        .bet-list {{
+            width: 280px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }}
+        .bet-list-title {{
+            font-size: 16px;
+            font-weight: 800;
+            color: #f2f3f5;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid rgba(255,255,255,0.1);
+        }}
+        .game-display {{
+            flex: 1;
+            position: relative;
+            min-height: 400px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 16px;
+            border: 2px solid rgba(255,255,255,0.05);
+            overflow: hidden;
+        }}
+        .game-title {{
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 32px;
+            font-weight: 900;
+            color: {title_color};
+            text-shadow: 0 0 20px {title_color}, 0 4px 8px rgba(0,0,0,0.8);
+            text-align: center;
+            z-index: 10;
+        }}
+        .game-subtitle {{
+            position: absolute;
+            top: 75px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 48px;
+            font-weight: 900;
+            color: #ffffff;
+            text-shadow: 0 0 30px {title_color}, 0 6px 12px rgba(0,0,0,0.9);
+            z-index: 10;
+        }}
+        </style>
+    </head>
+    <body>
+        <div id="target" class="crash-container">
+            <div class="bet-list">
+                <div class="bet-list-title">🎯 Active Bets ({len(bet_list)})</div>
+                {bet_rows_html}
+            </div>
+            <div class="game-display">
+                <div class="game-title">{title_text}</div>
+                <div class="game-subtitle">{subtitle_text}</div>
+                {rocket_svg}
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    return await _capture_html(doc)
+
+
+def generate_crash_gif(
+    phase: str,
+    multiplier: float = 1.0,
+    start_mult: float = 1.0,
+    countdown: int = 10,
+    bets: list = None,
+    fps: int = 15,
+    output_path: str = "crash_temp.gif"
+) -> str:
+    """
+    Generate animated GIF for crash game with exponential curve.
+    
+    Args:
+        phase: 'betting', 'running', 'supersonic', or 'crashed'
+        multiplier: Current multiplier (for running/supersonic phase)
+        start_mult: Starting multiplier for continuity (where last GIF left off)
+        countdown: Seconds remaining in betting phase
+        bets: List of current bets (for betting phase)
+        fps: Frames per second (default 15 for smooth animation)
+        output_path: Where to save the GIF
+    
+    Returns:
+        Path to generated GIF file
+    """
+    from PIL import Image, ImageDraw, ImageFont
+    import io
+    
+    frames = []
+    width, height = 700, 400
+    
+    # Try to load Poppins font, fallback to Arial
+    try:
+        title_font = ImageFont.truetype("C:/Windows/Fonts/Poppins-SemiBold.ttf", 42)
+        label_font = ImageFont.truetype("C:/Windows/Fonts/Poppins-Regular.ttf", 12)
+        bet_font = ImageFont.truetype("C:/Windows/Fonts/Poppins-Regular.ttf", 14)
+    except:
+        try:
+            title_font = ImageFont.truetype("arial.ttf", 42)
+            label_font = ImageFont.truetype("arial.ttf", 12)
+            bet_font = ImageFont.truetype("arial.ttf", 14)
+        except:
+            title_font = ImageFont.load_default()
+            label_font = ImageFont.load_default()
+            bet_font = ImageFont.load_default()
+    
+    if phase == 'betting':
+        # Show betting phase with bet list
+        for i in range(10):
+            img = Image.new('RGBA', (width, height), (0, 0, 0, 0))  # Transparent
+            draw = ImageDraw.Draw(img)
+            
+            # Countdown in top-left
+            countdown_num = countdown - (i % countdown) if countdown > 0 else 0
+            countdown_text = f"Starting in {countdown_num}s"
+            draw.text((20, 20), countdown_text, fill=(200, 200, 200), font=title_font)
+            
+            # Show bet list below
+            if bets:
+                y_offset = 80
+                draw.text((20, y_offset), "Current Bets:", fill=(150, 150, 150), font=bet_font)
+                y_offset += 30
+                
+                for bet in bets[:8]:  # Show max 8 bets
+                    username = bet.get('username', 'Unknown')[:15]
+                    amount = bet.get('amount', 0)
+                    bet_text = f"• {username}: {amount} coins"
+                    draw.text((30, y_offset), bet_text, fill=(180, 180, 180), font=label_font)
+                    y_offset += 25
+            
+            frames.append(img)
+    
+    elif phase in ['running', 'supersonic']:
+        # Generate exponential curve continuing from start_mult to multiplier
+        num_frames = 15
+        is_supersonic = phase == 'supersonic'
+        
+        # Graph shows from 1.0x to slightly above current multiplier
+        graph_min = 1.0
+        graph_max = multiplier + 1.0
+        
+        margin_left = 60
+        margin_right = 30
+        margin_top = 80
+        margin_bottom = 40
+        
+        for i in range(num_frames):
+            # Interpolate current multiplier
+            t = i / (num_frames - 1) if num_frames > 1 else 1
+            current_mult = start_mult + (multiplier - start_mult) * t
+            
+            # Colors
+            if is_supersonic:
+                line_color = (255, 140, 0)  # Orange
+                text_color = (255, 140, 0)
+            else:
+                line_color = (34, 197, 94)  # Green
+                text_color = (34, 197, 94)
+            
+            img = Image.new('RGBA', (width, height), (0, 0, 0, 0))  # Transparent!
+            draw = ImageDraw.Draw(img)
+            
+            graph_height = height - margin_top - margin_bottom
+            graph_width = width - margin_left - margin_right
+            
+            # Draw light gray grid lines
+            num_lines = 5
+            for j in range(num_lines):
+                mult_value = graph_min + (graph_max - graph_min) * (j / (num_lines - 1))
+                y = height - margin_bottom - (j / (num_lines - 1)) * graph_height
+                
+                # Light gray grid line
+                draw.line(
+                    [(margin_left, y), (width - margin_right, y)],
+                    fill=(180, 180, 180, 255),
+                    width=1
+                )
+                
+                # Label on left - light gray
+                label = f"{mult_value:.1f}x"
+                draw.text((8, y - 8), label, fill=(160, 160, 160), font=label_font)
+            
+            # Draw EXPONENTIAL curve from 1.0x to current_mult
+            # This is the key - we show the ENTIRE curve building up
+            line_points = []
+            num_curve_points = 100  # High resolution for smooth exponential
+            
+            for j in range(num_curve_points):
+                curve_t = j / (num_curve_points - 1)
+                
+                # Exponential curve: simulate how crash multiplier grows
+                # Maps from 1.0x at start to current_mult at end
+                if current_mult > 1.0:
+                    # Use exponential interpolation for realistic curve
+                    # mult = 1.0 * (1.08 ^ time) - matches actual crash formula
+                    curve_mult = 1.0 + (current_mult - 1.0) * (curve_t ** 0.8)  # Slightly exponential
+                else:
+                    curve_mult = 1.0
+                
+                # X position - full width represents the time elapsed
+                x = margin_left + (curve_t * graph_width)
+                
+                # Y position based on multiplier
+                if curve_mult <= graph_max and curve_mult >= graph_min:
+                    y_progress = (curve_mult - graph_min) / (graph_max - graph_min)
+                    y = height - margin_bottom - (y_progress * graph_height)
+                    line_points.append((x, y))
+            
+            # Draw the exponential curve with glow
+            if len(line_points) > 1:
+                # Glow layers
+                for glow_width in [12, 8, 4]:
+                    alpha = 30 if glow_width == 12 else 50 if glow_width == 8 else 80
+                    glow_color = line_color + (alpha,)
+                    draw.line(line_points, fill=glow_color, width=glow_width)
+                
+                # Main line
+                draw.line(line_points, fill=line_color + (255,), width=3)
+            
+            # Multiplier in top-left (Poppins font)
+            mult_text = f"{current_mult:.2f}x"
+            draw.text((20, 15), mult_text, fill=text_color, font=title_font)
+            
+            frames.append(img)
+    
+    else:  # crashed
+        # Show crash with full exponential curve
+        num_frames = 12
+        
+        graph_min = 1.0
+        graph_max = multiplier + 1.0
+        
+        margin_left = 60
+        margin_right = 30
+        margin_top = 80
+        margin_bottom = 40
+        
+        for i in range(num_frames):
+            img = Image.new('RGBA', (width, height), (0, 0, 0, 0))  # Transparent
+            draw = ImageDraw.Draw(img)
+            
+            graph_height = height - margin_top - margin_bottom
+            graph_width = width - margin_left - margin_right
+            
+            # Grid lines - light gray
+            num_lines = 5
+            for j in range(num_lines):
+                mult_value = graph_min + (graph_max - graph_min) * (j / (num_lines - 1))
+                y = height - margin_bottom - (j / (num_lines - 1)) * graph_height
+                
+                draw.line(
+                    [(margin_left, y), (width - margin_right, y)],
+                    fill=(180, 180, 180, 255),
+                    width=1
+                )
+                
+                label = f"{mult_value:.1f}x"
+                draw.text((8, y - 8), label, fill=(160, 160, 160), font=label_font)
+            
+            # Draw full exponential curve up to crash point
+            line_points = []
+            num_curve_points = 100
+            
+            for j in range(num_curve_points):
+                curve_t = j / (num_curve_points - 1)
+                
+                if multiplier > 1.0:
+                    curve_mult = 1.0 + (multiplier - 1.0) * (curve_t ** 0.8)
+                else:
+                    curve_mult = 1.0
+                
+                x = margin_left + (curve_t * graph_width)
+                
+                if curve_mult <= graph_max and curve_mult >= graph_min:
+                    y_progress = (curve_mult - graph_min) / (graph_max - graph_min)
+                    y = height - margin_bottom - (y_progress * graph_height)
+                    line_points.append((x, y))
+            
+            # Draw red curve
+            if len(line_points) > 1:
+                for glow_width in [12, 8, 4]:
+                    alpha = 30 if glow_width == 12 else 50 if glow_width == 8 else 80
+                    draw.line(line_points, fill=(220, 50, 50, alpha), width=glow_width)
+                
+                draw.line(line_points, fill=(220, 50, 50, 255), width=3)
+            
+            # Explosion at end
+            if line_points and i < 8:
+                crash_x, crash_y = line_points[-1]
+                explosion_radius = 15 + (i * 10)
+                explosion_alpha = max(0, 255 - (i * 32))
+                
+                for r_offset in [0, -10, 10]:
+                    r = explosion_radius + r_offset
+                    if r > 0:
+                        draw.ellipse(
+                            [crash_x - r, crash_y - r, crash_x + r, crash_y + r],
+                            fill=(255, 150, 0, max(0, explosion_alpha - abs(r_offset) * 10))
+                        )
+                
+                draw.ellipse(
+                    [crash_x - 8, crash_y - 8, crash_x + 8, crash_y + 8],
+                    fill=(255, 255, 255, explosion_alpha)
+                )
+            
+            # Crashed multiplier in top-left
+            mult_text = f"{multiplier:.2f}x"
+            draw.text((20, 15), mult_text, fill=(220, 50, 50), font=title_font)
+            
+            # "CRASHED" subtitle
+            try:
+                subtitle_font = ImageFont.truetype("C:/Windows/Fonts/Poppins-Regular.ttf", 18)
+            except:
+                subtitle_font = label_font
+            
+            draw.text((20, 62), "CRASHED!", fill=(255, 100, 100), font=subtitle_font)
+            
+            frames.append(img)
+    
+    # Save as animated GIF
+    if frames:
+        duration = int(1000 / fps)  # Duration per frame in milliseconds
+        frames[0].save(
+            output_path,
+            save_all=True,
+            append_images=frames[1:],
+            duration=duration,
+            loop=0,  # Loop forever
+            optimize=False
+        )
+    
+    return output_path
+
+
+def generate_bet_results_image(bets: list, output_path: str = "crash_bets.png") -> str:
+    """
+    Generate static image showing bet results table.
+    
+    Args:
+        bets: List of bet dictionaries with username, amount, cashed_out, cashout_multiplier
+        output_path: Where to save the image
+    
+    Returns:
+        Path to generated image file
+    """
+    from PIL import Image, ImageDraw, ImageFont
+    
+    width = 700
+    row_height = 35
+    header_height = 40
+    padding = 20
+    height = header_height + (len(bets) * row_height) + padding if bets else 100
+    
+    # Transparent background
+    img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    
+    # Try to load Poppins font
+    try:
+        header_font = ImageFont.truetype("C:/Windows/Fonts/Poppins-SemiBold.ttf", 14)
+        row_font = ImageFont.truetype("C:/Windows/Fonts/Poppins-Regular.ttf", 13)
+    except:
+        try:
+            header_font = ImageFont.truetype("arial.ttf", 14)
+            row_font = ImageFont.truetype("arial.ttf", 13)
+        except:
+            header_font = ImageFont.load_default()
+            row_font = ImageFont.load_default()
+    
+    # Table header
+    y = 10
+    draw.text((20, y), "Player", fill=(180, 180, 180), font=header_font)
+    draw.text((250, y), "Bet", fill=(180, 180, 180), font=header_font)
+    draw.text((400, y), "Multiplier", fill=(180, 180, 180), font=header_font)
+    draw.text((550, y), "Result", fill=(180, 180, 180), font=header_font)
+    
+    # Separator line
+    y += 30
+    draw.line([(20, y), (width - 20, y)], fill=(100, 100, 100), width=1)
+    
+    y += 10
+    
+    # Bet rows
+    if not bets:
+        draw.text((20, y), "No bets placed", fill=(150, 150, 150), font=row_font)
+    else:
+        for bet in bets:
+            username = str(bet.get('username', 'Unknown'))[:18]
+            amount = bet.get('amount', 0)
+            cashed_out = bet.get('cashed_out', False)
+            cashout_mult = bet.get('cashout_multiplier', 0)
+            
+            # Player name
+            draw.text((20, y), username, fill=(200, 200, 200), font=row_font)
+            
+            # Bet amount
+            draw.text((250, y), f"{amount}", fill=(200, 200, 200), font=row_font)
+            
+            # Result
+            if cashed_out:
+                # Cashed out - show multiplier and winnings
+                winnings = int(amount * cashout_mult)
+                draw.text((400, y), f"{cashout_mult:.2f}x", fill=(34, 197, 94), font=row_font)
+                draw.text((550, y), f"+{winnings}", fill=(34, 197, 94), font=row_font)
+            else:
+                # Still active or lost
+                draw.text((400, y), "-", fill=(150, 150, 150), font=row_font)
+                draw.text((550, y), "Lost", fill=(220, 50, 50), font=row_font)
+            
+            y += row_height
+    
+    img.save(output_path, "PNG")
+    return output_path

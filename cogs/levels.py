@@ -66,21 +66,48 @@ class Levels(commands.Cog):
         self.bot = bot
 
     async def _ensure_milestone_roles(self, guild: discord.Guild) -> dict[int, discord.Role]:
-        """Finds or creates the 5 milestone tier roles on the server."""
+        """Finds or creates the 4 milestone tier roles on the server with gradients and icons if available."""
+        from functions.levels import MILESTONE_ROLE_ICONS, MILESTONE_ROLE_GRADIENTS
+        
         roles_by_lvl = {}
+        
+        # Check if guild has role icon feature (boost level 2+)
+        has_role_icons = guild.premium_tier >= 2
+        
         for lvl in LEVEL_MILESTONES:
             role_name = MILESTONE_ROLE_NAMES[lvl]
             existing_role = discord.utils.get(guild.roles, name=role_name)
+            
             if not existing_role:
                 try:
+                    # Use gradient color if available, otherwise base color
+                    if has_role_icons and lvl in MILESTONE_ROLE_GRADIENTS:
+                        # Use the lighter shade for better visibility
+                        color_value = MILESTONE_ROLE_GRADIENTS[lvl][1]
+                    else:
+                        color_value = MILESTONE_ROLE_COLORS[lvl]
+                    
+                    # Create role
                     existing_role = await guild.create_role(
                         name=role_name,
-                        color=discord.Color(MILESTONE_ROLE_COLORS[lvl]),
+                        color=discord.Color(color_value),
                         reason=f"Auto-created level {lvl} milestone role",
                     )
+                    
+                    # Add role icon if guild supports it
+                    if has_role_icons and lvl in MILESTONE_ROLE_ICONS:
+                        try:
+                            icon_emoji = self.bot.get_emoji(MILESTONE_ROLE_ICONS[lvl])
+                            if icon_emoji:
+                                await existing_role.edit(display_icon=icon_emoji)
+                        except (discord.Forbidden, discord.HTTPException):
+                            pass  # Icon setting failed, role still usable
+                    
                 except discord.Forbidden:
                     continue
+            
             roles_by_lvl[lvl] = existing_role
+        
         return roles_by_lvl
 
     @commands.Cog.listener()

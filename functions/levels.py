@@ -17,20 +17,36 @@ _levels_data: Optional[dict] = None
 _xp_cooldowns: dict[tuple[int, int], float] = {}  # (guild_id, user_id) -> last_xp_timestamp
 
 # Level Milestones and Role Config
-LEVEL_MILESTONES = [5, 10, 15, 20, 25]
+LEVEL_MILESTONES = [5, 10, 15, 20]  # Removed 25, only using 5/10/15/20
+
 MILESTONE_ROLE_NAMES = {
-    5: "Level 5 🥉",
-    10: "Level 10 🥈",
-    15: "Level 15 🥇",
-    20: "Level 20 💎",
-    25: "Level 25 👑",
+    5: "Level 5",
+    10: "Level 10",
+    15: "Level 15",
+    20: "Level 20",
 }
+
 MILESTONE_ROLE_COLORS = {
-    5: 0xcd7f32,   # Bronze
-    10: 0xc0c0c0,  # Silver
-    15: 0xffd700,  # Gold
-    20: 0x3d8cff,  # Diamond Blue
-    25: 0xa240f7,  # Purple Crown
+    5: 0x1F8B4C,   # Dark Green
+    10: 0x1ABC9C,  # Cyan/Teal Greenish
+    15: 0x3498DB,  # Light Blue
+    20: 0x206694,  # Blue
+}
+
+# Gradient variations for servers with role icon boosts
+MILESTONE_ROLE_GRADIENTS = {
+    5: (0x0F5C2C, 0x2FBB6C),   # Dark green -> Light green
+    10: (0x0A9C8C, 0x2ADCBC),  # Dark cyan -> Light cyan
+    15: (0x2478BB, 0x54B8FB),  # Dark blue -> Light blue  
+    20: (0x104674, 0x3086B4),  # Dark blue -> Medium blue
+}
+
+# Role icon emoji IDs
+MILESTONE_ROLE_ICONS = {
+    5: 1544506219757174784,   # <:level_5:...>
+    10: 1544507065391915110,  # <:level_10:...>
+    15: 1544507064720556082,  # <:level_15:...>
+    20: 1544507063764516936,  # <:level_20:...>
 }
 
 
@@ -73,8 +89,22 @@ def _guild_levels(data: dict, guild_id: int) -> dict:
 
 
 def xp_for_level(level: int) -> int:
-    """Returns the total XP required to complete a given level."""
-    return 100 * (level ** 2) + 50 * level
+    """
+    Returns the total XP required to complete a given level.
+    
+    Formula:
+    - Levels 1-10: 35 * (level^2) + 15 * level  (3x easier than before)
+    - Levels 11+: 65 * (level^2) + 35 * level   (1.5x easier than before)
+    
+    This makes early leveling much easier to get players hooked,
+    while still maintaining progression at higher levels.
+    """
+    if level <= 10:
+        # Early game - very easy (3x easier)
+        return 35 * (level ** 2) + 15 * level
+    else:
+        # Late game - easier but not too easy (1.5x easier)
+        return 65 * (level ** 2) + 35 * level
 
 
 def add_xp(guild_id: int, user_id: int, xp_to_add: int = 15) -> tuple[int, int, bool]:
