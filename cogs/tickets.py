@@ -86,7 +86,8 @@ class Tickets(commands.Cog):
     ) -> None:
         target_channel = channel or interaction.channel
         if not isinstance(target_channel, discord.TextChannel):
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Ticket panels must be sent in a text channel.",
                 ephemeral=True,
             )
@@ -95,7 +96,8 @@ class Tickets(commands.Cog):
         panel_view = create_ticket_panel_view()
         await target_channel.send(view=panel_view)
 
-        await interaction.response.send_message(
+        await interaction.response.defer()
+        await interaction.followup.send(
             f"{config.EMOJI_TICK} Ticket panel successfully sent to {target_channel.mention}!",
             ephemeral=True,
         )
@@ -148,7 +150,8 @@ class Tickets(commands.Cog):
     @app_commands.describe(user="The member to add to this ticket")
     async def add_member(self, interaction: discord.Interaction, user: discord.Member) -> None:
         if not is_moderator(interaction.user):
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} You need Manage Messages permissions to add members.",
                 ephemeral=True,
             )
@@ -159,7 +162,8 @@ class Tickets(commands.Cog):
             return
 
         await channel.set_permissions(user, read_messages=True, send_messages=True, attach_files=True)
-        await interaction.response.send_message(
+        await interaction.response.defer()
+        await interaction.followup.send(
             f"{config.EMOJI_TICK} Added {user.mention} to this ticket.",
         )
 
@@ -170,7 +174,8 @@ class Tickets(commands.Cog):
     @app_commands.describe(user="The member to remove from this ticket")
     async def remove_member(self, interaction: discord.Interaction, user: discord.Member) -> None:
         if not is_moderator(interaction.user):
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} You need Manage Messages permissions to remove members.",
                 ephemeral=True,
             )
@@ -181,7 +186,8 @@ class Tickets(commands.Cog):
             return
 
         await channel.set_permissions(user, overwrite=None)
-        await interaction.response.send_message(
+        await interaction.response.defer()
+        await interaction.followup.send(
             f"{config.EMOJI_TICK} Removed {user.mention} from this ticket.",
         )
 
@@ -219,7 +225,8 @@ class Tickets(commands.Cog):
             if t_meta.get("user_id") == user.id and t_meta.get("type") == ticket_type:
                 existing_ch = guild.get_channel(int(ch_id_str))
                 if existing_ch:
-                    await interaction.response.send_message(
+                    await interaction.response.defer()
+                    await interaction.followup.send(
                         f"{config.EMOJI_WARN} You already have an open ticket: {existing_ch.mention}",
                         ephemeral=True,
                     )
@@ -270,7 +277,8 @@ class Tickets(commands.Cog):
             )
         except Exception as e:
             logger.error(f"Failed to create ticket channel: {e}", exc_info=True)
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Failed to create ticket channel. Please ensure the bot has **Manage Channels** permission.",
                 ephemeral=True,
             )
@@ -281,7 +289,8 @@ class Tickets(commands.Cog):
         welcome_view = create_ticket_welcome_view(user, ticket_type, ticket_num)
         await ticket_channel.send(view=welcome_view)
 
-        await interaction.response.send_message(
+        await interaction.response.defer()
+        await interaction.followup.send(
             f"{config.EMOJI_TICK} Your ticket has been created: {ticket_channel.mention}",
             ephemeral=True,
         )
@@ -295,7 +304,8 @@ class Tickets(commands.Cog):
             return
 
         view = ConfirmCloseView(channel, interaction.user)
-        await interaction.response.send_message(
+        await interaction.response.defer()
+        await interaction.followup.send(
             "⚠️ **Are you sure you want to close this ticket?**",
             view=view,
             ephemeral=True,
@@ -310,7 +320,8 @@ class Tickets(commands.Cog):
         guild = channel.guild
         ticket_info = remove_ticket_record(guild.id, channel.id)
 
-        await interaction.response.send_message(
+        await interaction.response.defer()
+        await interaction.followup.send(
             f"{config.EMOJI_WARN} Ticket will close and delete in **5 seconds**...",
         )
 
@@ -350,7 +361,8 @@ class Tickets(commands.Cog):
 
     async def handle_claim_ticket(self, interaction: discord.Interaction) -> None:
         if not is_moderator(interaction.user):
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Only staff members can claim tickets.",
                 ephemeral=True,
             )
@@ -362,11 +374,13 @@ class Tickets(commands.Cog):
 
         claimed = claim_ticket(interaction.guild_id, channel.id, interaction.user.id)
         if claimed:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_TICK} Ticket has been claimed by {interaction.user.mention}!",
             )
         else:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_INFO} Ticket claim recorded for {interaction.user.mention}.",
             )
 

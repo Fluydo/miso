@@ -2059,7 +2059,8 @@ def generate_crash_gif(
     script_dir = os.path.dirname(os.path.abspath(__file__))
     bot_dir = os.path.dirname(script_dir)  # Go up one level to bot root
     
-    node_script = os.path.join(bot_dir, "generate_gif.js")
+    # Use HTML to GIF generator (Puppeteer + gif-encoder, NO ffmpeg!)
+    node_script = os.path.join(bot_dir, "generate_html_gif.js")
     
     # Map phase names
     phase_map = {
@@ -2072,7 +2073,7 @@ def generate_crash_gif(
     mapped_phase = phase_map.get(phase, 'running')
     
     try:
-        # Call Node.js script to generate GIF with shorter timeout
+        # Call Node.js script to generate GIF
         result = subprocess.run(
             ["node", node_script, mapped_phase, str(multiplier), output_path],
             cwd=bot_dir,
@@ -2080,7 +2081,7 @@ def generate_crash_gif(
             text=True,
             encoding='utf-8',
             errors='ignore',  # Ignore decode errors
-            timeout=10  # Reduced timeout to 10 seconds
+            timeout=5  # Short timeout - simple script should be fast
         )
         
         if result.returncode == 0 and os.path.exists(output_path):

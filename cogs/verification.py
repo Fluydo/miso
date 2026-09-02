@@ -244,7 +244,8 @@ class Verification(commands.Cog):
 
         added = add_exception_channel(interaction.guild.id, channel.id)
         if not added:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_INFO} {channel.mention} is already an exception channel.",
                 ephemeral=True,
             )
@@ -273,13 +274,15 @@ class Verification(commands.Cog):
                     reason="Verification Exception — verified role access",
                 )
         except discord.Forbidden:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Missing permissions to edit channel overwrites.",
                 ephemeral=True,
             )
             return
 
-        await interaction.response.send_message(
+        await interaction.response.defer()
+        await interaction.followup.send(
             f"{config.EMOJI_TICK} {channel.mention} is now an exception channel — unverified users can view it read-only, verified members can chat.",
             ephemeral=True,
         )
@@ -293,7 +296,8 @@ class Verification(commands.Cog):
 
         removed = remove_exception_channel(interaction.guild.id, channel.id)
         if not removed:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_INFO} {channel.mention} is not in the exception list.",
                 ephemeral=True,
             )
@@ -320,13 +324,15 @@ class Verification(commands.Cog):
                     reason="Verification Exception Removed — reset to standard",
                 )
         except discord.Forbidden:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Exception removed from config, but missing permissions to update channel overwrites.",
                 ephemeral=True,
             )
             return
 
-        await interaction.response.send_message(
+        await interaction.response.defer()
+        await interaction.followup.send(
             f"{config.EMOJI_TICK} {channel.mention} is no longer an exception channel — unverified users will no longer see it.",
             ephemeral=True,
         )

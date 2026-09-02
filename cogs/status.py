@@ -24,7 +24,8 @@ class Status(commands.Cog):
             return
 
         embed = user_status_embed(target)
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed)
 
 
 async def setup(bot: commands.Bot) -> None:

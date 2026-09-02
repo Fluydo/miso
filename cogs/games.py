@@ -113,7 +113,8 @@ class MinesTileButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction) -> None:
         view: MinesGameView = self.view  # type: ignore
         if interaction.user.id != view.player_id:
-            await interaction.response.send_message("This is not your Mines game!", ephemeral=True)
+            await interaction.response.defer()
+            await interaction.followup.send("This is not your Mines game!", ephemeral=True)
             return
         await view.handle_tile_click(interaction, self.tile_index)
 
@@ -132,7 +133,8 @@ class MinesCashoutButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction) -> None:
         view: MinesGameView = self.view  # type: ignore
         if interaction.user.id != view.player_id:
-            await interaction.response.send_message("This is not your Mines game!", ephemeral=True)
+            await interaction.response.defer()
+            await interaction.followup.send("This is not your Mines game!", ephemeral=True)
             return
         await view.handle_cashout(interaction)
 
@@ -399,7 +401,8 @@ class BlackjackView(discord.ui.View):
     @discord.ui.button(label="Hit", style=discord.ButtonStyle.primary, emoji="🃏")
     async def hit(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         if interaction.user.id != self.player_id:
-            await interaction.response.send_message("This is not your game!", ephemeral=True)
+            await interaction.response.defer()
+            await interaction.followup.send("This is not your game!", ephemeral=True)
             return
 
         self.player_cards.append(_draw_card())
@@ -421,7 +424,8 @@ class BlackjackView(discord.ui.View):
     @discord.ui.button(label="Stand", style=discord.ButtonStyle.secondary, emoji="🛑")
     async def stand(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         if interaction.user.id != self.player_id:
-            await interaction.response.send_message("This is not your game!", ephemeral=True)
+            await interaction.response.defer()
+            await interaction.followup.send("This is not your game!", ephemeral=True)
             return
         await self.stand_callback(interaction)
 
@@ -563,7 +567,8 @@ class TowerClimberView(discord.ui.View):
     def make_pick_callback(self, tile_index: int):
         async def callback(interaction: discord.Interaction):
             if interaction.user.id != self.player_id:
-                await interaction.response.send_message("This is not your Tower game!", ephemeral=True)
+                await interaction.response.defer()
+                await interaction.followup.send("This is not your Tower game!", ephemeral=True)
                 return
             await self.handle_pick(interaction, tile_index)
         return callback
@@ -638,7 +643,8 @@ class TowerClimberView(discord.ui.View):
 
     async def cashout_callback(self, interaction: discord.Interaction) -> None:
         if interaction.user.id != self.player_id:
-            await interaction.response.send_message("This is not your Tower game!", ephemeral=True)
+            await interaction.response.defer()
+            await interaction.followup.send("This is not your Tower game!", ephemeral=True)
             return
         await self.handle_cashout(interaction)
 
@@ -768,7 +774,8 @@ class LeaderboardPaginationView(discord.ui.View):
 
     async def prev_page(self, interaction: discord.Interaction) -> None:
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("This is not your menu!", ephemeral=True)
+            await interaction.response.defer()
+            await interaction.followup.send("This is not your menu!", ephemeral=True)
             return
         if self.current_page > 1:
             self.current_page -= 1
@@ -834,14 +841,16 @@ class Games(commands.Cog):
         total_tiles = grid_size * grid_size
 
         if bet < 10:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Minimum bet is **10** {config.EMOJI_COIN} coins.",
                 ephemeral=True,
             )
             return
 
         if not (1 <= bombs < total_tiles):
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Bombs count must be between **1 and {total_tiles - 1}**.",
                 ephemeral=True,
             )
@@ -849,7 +858,8 @@ class Games(commands.Cog):
 
         user_balance = await get_balance(interaction.user.id)
         if user_balance < bet:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} You don't have enough coins! Balance: **{user_balance}** {config.EMOJI_COIN}",
                 ephemeral=True,
             )
@@ -888,7 +898,8 @@ class Games(commands.Cog):
     @app_commands.describe(bet="Amount of coins to bet (minimum 10)")
     async def blackjack(self, interaction: discord.Interaction, bet: int = 50) -> None:
         if bet < 10:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Minimum bet is **10** {config.EMOJI_COIN} coins.",
                 ephemeral=True,
             )
@@ -896,7 +907,8 @@ class Games(commands.Cog):
 
         balance = await get_balance(interaction.user.id)
         if balance < bet:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Insufficient balance! You have **{balance}** {config.EMOJI_COIN}",
                 ephemeral=True,
             )
@@ -956,7 +968,8 @@ class Games(commands.Cog):
         difficulty: app_commands.Choice[str] = None,
     ) -> None:
         if bet < 10:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Minimum bet is **10** {config.EMOJI_COIN} coins.",
                 ephemeral=True,
             )
@@ -964,7 +977,8 @@ class Games(commands.Cog):
 
         balance = await get_balance(interaction.user.id)
         if balance < bet:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Insufficient balance! You have **{balance}** {config.EMOJI_COIN}",
                 ephemeral=True,
             )
@@ -1006,7 +1020,8 @@ class Games(commands.Cog):
         space: str,
     ) -> None:
         if bet < 10:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Minimum bet is **10** {config.EMOJI_COIN} coins.",
                 ephemeral=True,
             )
@@ -1014,7 +1029,8 @@ class Games(commands.Cog):
 
         balance = await get_balance(interaction.user.id)
         if balance < bet:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Insufficient balance! You have **{balance}** {config.EMOJI_COIN}",
                 ephemeral=True,
             )
@@ -1025,7 +1041,8 @@ class Games(commands.Cog):
         is_num = space_clean.isdigit() and (0 <= int(space_clean) <= 36)
 
         if space_clean not in valid_spaces and not is_num:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Invalid space! Choose `red`, `black`, `green`, or a number `0-36`.",
                 ephemeral=True,
             )
@@ -1092,7 +1109,8 @@ class Games(commands.Cog):
     @app_commands.describe(bet="Amount of coins to bet (minimum 10)")
     async def slots(self, interaction: discord.Interaction, bet: int = 25) -> None:
         if bet < 10:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Minimum bet is **10** {config.EMOJI_COIN} coins.",
                 ephemeral=True,
             )
@@ -1100,7 +1118,8 @@ class Games(commands.Cog):
 
         balance = await get_balance(interaction.user.id)
         if balance < bet:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Insufficient balance! You have **{balance}** {config.EMOJI_COIN}",
                 ephemeral=True,
             )
@@ -1171,7 +1190,8 @@ class Games(commands.Cog):
         choice: app_commands.Choice[str],
     ) -> None:
         if bet < 10:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Minimum bet is **10** {config.EMOJI_COIN} coins.",
                 ephemeral=True,
             )
@@ -1179,7 +1199,8 @@ class Games(commands.Cog):
 
         balance = await get_balance(interaction.user.id)
         if balance < bet:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Insufficient balance! You have **{balance}** {config.EMOJI_COIN}",
                 ephemeral=True,
             )
@@ -1223,7 +1244,8 @@ class Games(commands.Cog):
     async def richest(self, interaction: discord.Interaction) -> None:
         leaderboard_data = await get_rich_leaderboard(limit=50)
         if not leaderboard_data:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 "*No economy records found yet. Run `/daily` to get started!*",
                 ephemeral=True,
             )
@@ -1265,7 +1287,8 @@ class Games(commands.Cog):
         )
         embed.set_thumbnail(url=target.display_avatar.url)
         embed.set_footer(text=f"{config.BOT_NAME} Economy • Use /daily for free coins")
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed)
 
     # ==========================================
     # /DAILY
@@ -1293,7 +1316,8 @@ class Games(commands.Cog):
             )
 
         embed.set_footer(text=f"{config.BOT_NAME} Daily Rewards")
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed)
 
     # ==========================================
     # /PAY
@@ -1317,13 +1341,15 @@ class Games(commands.Cog):
                 ),
                 color=config.COLOR_SUCCESS,
             )
-            await interaction.response.send_message(embed=embed)
+            await interaction.response.defer()
+            await interaction.followup.send(embed=embed)
         else:
             embed = discord.Embed(
                 description=f"{config.EMOJI_CROSS} {message}",
                 color=config.COLOR_ERROR,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.response.defer()
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
     # ==========================================
     # ADMIN COMMANDS
@@ -1338,7 +1364,8 @@ class Games(commands.Cog):
         amount: int,
     ) -> None:
         if amount <= 0:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Amount must be positive!",
                 ephemeral=True,
             )
@@ -1365,7 +1392,8 @@ class Games(commands.Cog):
         amount: int,
     ) -> None:
         if amount <= 0:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Amount must be positive!",
                 ephemeral=True,
             )
@@ -1407,7 +1435,8 @@ class Games(commands.Cog):
         amount: int,
     ) -> None:
         if amount < 0:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Amount cannot be negative!",
                 ephemeral=True,
             )

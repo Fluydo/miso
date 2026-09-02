@@ -6,10 +6,17 @@
   "scripts": {
     "test": "node generate_gif.js running 2.5 test.gif"
   },
-  "keywords": ["discord", "bot", "gif", "puppeteer"],
+  "keywords": [
+    "discord",
+    "bot",
+    "gif",
+    "puppeteer"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "get-pixels": "^3.3.3",
+    "gif-encoder": "^0.7.2",
     "puppeteer": "^21.0.0"
   }
 }

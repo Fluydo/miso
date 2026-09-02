@@ -274,7 +274,8 @@ class Invites(commands.Cog):
         target = user or interaction.user
         stats = get_invite_stats(interaction.guild.id, target.id)
         embed = invites_embed(target, stats, interaction.guild)
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed)
 
     @invites_group.command(name="leaderboard", description="Show the top inviters in this server.")
     async def invites_leaderboard(self, interaction: discord.Interaction) -> None:
@@ -283,7 +284,8 @@ class Invites(commands.Cog):
 
         entries = get_leaderboard(interaction.guild.id, limit=50)
         if not entries:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 "*No invites recorded for this server yet.*",
                 ephemeral=True,
             )
@@ -346,7 +348,8 @@ class Invites(commands.Cog):
             ),
             color=config.COLOR_SUCCESS,
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:

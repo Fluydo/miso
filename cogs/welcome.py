@@ -101,7 +101,8 @@ class Welcome(commands.Cog):
         if not interaction.guild:
             return
         set_welcome_channel(interaction.guild.id, channel.id)
-        await interaction.response.send_message(
+        await interaction.response.defer()
+        await interaction.followup.send(
             f"{config.EMOJI_TICK} Welcome messages will now be sent to {channel.mention} with custom visual cards.",
             ephemeral=True,
         )
@@ -113,7 +114,8 @@ class Welcome(commands.Cog):
         if not interaction.guild:
             return
         set_leave_channel(interaction.guild.id, channel.id)
-        await interaction.response.send_message(
+        await interaction.response.defer()
+        await interaction.followup.send(
             f"{config.EMOJI_TICK} Leave messages will now be sent to {channel.mention} with custom visual cards.",
             ephemeral=True,
         )
@@ -124,7 +126,8 @@ class Welcome(commands.Cog):
         if not interaction.guild:
             return
         set_welcome_channel(interaction.guild.id, None)
-        await interaction.response.send_message(f"{config.EMOJI_TICK} Welcome messages disabled.", ephemeral=True)
+        await interaction.response.defer()
+        await interaction.followup.send(f"{config.EMOJI_TICK} Welcome messages disabled.", ephemeral=True)
 
     @app_commands.command(name="disableleave", description="Disable leave announcements.")
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -132,7 +135,8 @@ class Welcome(commands.Cog):
         if not interaction.guild:
             return
         set_leave_channel(interaction.guild.id, None)
-        await interaction.response.send_message(f"{config.EMOJI_TICK} Leave messages disabled.", ephemeral=True)
+        await interaction.response.defer()
+        await interaction.followup.send(f"{config.EMOJI_TICK} Leave messages disabled.", ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:

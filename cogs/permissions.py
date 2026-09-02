@@ -512,7 +512,8 @@ class Permissions(commands.Cog):
             inline=False
         )
         
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
     
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
@@ -556,7 +557,8 @@ class Permissions(commands.Cog):
             # Try to respond
             try:
                 if not interaction.response.is_done():
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    await interaction.response.defer()
+                    await interaction.followup.send(embed=embed, ephemeral=True)
                 else:
                     await interaction.followup.send(embed=embed, ephemeral=True)
             except:

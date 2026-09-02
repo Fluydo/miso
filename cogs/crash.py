@@ -324,23 +324,34 @@ class Crash(commands.Cog):
             # Create view with buttons
             view = CrashButtons(self.bot, self.supabase)
             
-            # Prepare GIF file
-            gif_file = discord.File(temp_gif_path, filename="crash.gif")
-            
-            # Update message (Component v2 format: content + file + view, NO embed)
-            try:
-                message = await channel.fetch_message(self.live_message_id)
-                await message.edit(content=content, attachments=[gif_file], view=view)
-            except discord.NotFound:
-                # Message deleted, create new one
-                new_msg = await channel.send(content=content, file=gif_file, view=view)
-                self.live_message_id = new_msg.id
-            
-            # Clean up temp file
-            try:
-                os.remove(temp_gif_path)
-            except:
-                pass
+            # Check if GIF was created, if not skip attachment
+            if os.path.exists(temp_gif_path):
+                # Prepare GIF file
+                gif_file = discord.File(temp_gif_path, filename="crash.gif")
+                
+                # Update message (Component v2 format: content + file + view, NO embed)
+                try:
+                    message = await channel.fetch_message(self.live_message_id)
+                    await message.edit(content=content, attachments=[gif_file], view=view)
+                except discord.NotFound:
+                    # Message deleted, create new one
+                    new_msg = await channel.send(content=content, file=gif_file, view=view)
+                    self.live_message_id = new_msg.id
+                    
+                # Clean up temp file
+                try:
+                    os.remove(temp_gif_path)
+                except:
+                    pass
+            else:
+                # GIF failed to generate, send without it (but still Component v2)
+                print(f"[CRASH] GIF not found at {temp_gif_path}, sending text only")
+                try:
+                    message = await channel.fetch_message(self.live_message_id)
+                    await message.edit(content=content, attachments=[], view=view)
+                except discord.NotFound:
+                    new_msg = await channel.send(content=content, view=view)
+                    self.live_message_id = new_msg.id
                 
         except Exception as e:
             print(f"Live message update error: {e}")
@@ -389,10 +400,12 @@ class Crash(commands.Cog):
     @app_commands.command(name="crash", description="View current crash game status")
     async def crash_info(self, interaction: discord.Interaction):
         """View current crash game"""
+        await interaction.response.defer(ephemeral=True)
+        
         result = self.supabase.table('crash_games').select('*').order('created_at', desc=True).limit(1).execute()
         
         if not result.data:
-            await interaction.response.send_message("❌ No active crash game!", ephemeral=True)
+            await interaction.followup.send("❌ No active crash game!", ephemeral=True)
             return
             
         game = result.data[0]
@@ -421,7 +434,7 @@ class Crash(commands.Cog):
                 color=discord.Color.red()
             )
             
-        await interaction.response.send_message(embed=embed)
+        await interaction.followup.send(embed=embed, ephemeral=True)
         
     @app_commands.command(name="crashbet", description="Bet on the crash game")
     async def crash_bet(self, interaction: discord.Interaction, amount: int):
@@ -535,7 +548,8 @@ class Crash(commands.Cog):
         msg = await channel.send(content=content, view=view)
         self.live_message_id = msg.id
         
-        await interaction.response.send_message(
+        await interaction.response.defer()
+        await interaction.followup.send(
             f"✅ Crash live channel set to {channel.mention}\nMessage ID: {msg.id}",
             ephemeral=True
         )

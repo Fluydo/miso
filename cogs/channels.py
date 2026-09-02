@@ -173,7 +173,8 @@ class Channels(commands.Cog):
     ) -> None:
         target = channel or interaction.channel
         if not isinstance(target, discord.TextChannel):
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Image-only mode can only be set on text channels.",
                 ephemeral=True,
             )
@@ -181,13 +182,15 @@ class Channels(commands.Cog):
 
         added = add_image_channel(interaction.guild_id, target.id)
         if not added:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_INFO} {target.mention} is already an image-only channel.",
                 ephemeral=True,
             )
             return
 
-        await interaction.response.send_message(
+        await interaction.response.defer()
+        await interaction.followup.send(
             f"{config.EMOJI_TICK} {target.mention} is now **image-only** — "
             f"any message without an image will be automatically deleted.",
             ephemeral=True,
@@ -207,7 +210,8 @@ class Channels(commands.Cog):
     ) -> None:
         target = channel or interaction.channel
         if not isinstance(target, discord.TextChannel):
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} This command only applies to text channels.",
                 ephemeral=True,
             )
@@ -215,13 +219,15 @@ class Channels(commands.Cog):
 
         removed = remove_image_channel(interaction.guild_id, target.id)
         if not removed:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_INFO} {target.mention} is not an image-only channel.",
                 ephemeral=True,
             )
             return
 
-        await interaction.response.send_message(
+        await interaction.response.defer()
+        await interaction.followup.send(
             f"{config.EMOJI_TICK} Removed image-only restriction from {target.mention}.",
             ephemeral=True,
         )
@@ -249,7 +255,8 @@ class Channels(commands.Cog):
     ) -> None:
         target = channel or interaction.channel
         if not isinstance(target, discord.TextChannel):
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} The counting channel must be a text channel.",
                 ephemeral=True,
             )
@@ -257,7 +264,8 @@ class Channels(commands.Cog):
 
         set_counting_channel(interaction.guild_id, target.id)
 
-        await interaction.response.send_message(
+        await interaction.response.defer()
+        await interaction.followup.send(
             f"{config.EMOJI_TICK} {target.mention} is now the **counting channel**.\n"
             f"Count starts at `1` — only sequential numbers are allowed, "
             f"and the same person cannot count twice in a row.",
@@ -288,7 +296,8 @@ class Channels(commands.Cog):
     ) -> None:
         cfg = get_counting_config(interaction.guild_id)
         if not cfg.get("channel_id"):
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 f"{config.EMOJI_CROSS} No counting channel is set. Use `/counting set` first.",
                 ephemeral=True,
             )
@@ -301,7 +310,8 @@ class Channels(commands.Cog):
         status = "enabled" if enabled else "disabled"
         emoji = config.EMOJI_TICK if enabled else config.EMOJI_WARN
 
-        await interaction.response.send_message(
+        await interaction.response.defer()
+        await interaction.followup.send(
             f"{emoji} Counting in {ch_mention} is now **{status}**.",
             ephemeral=True,
         )

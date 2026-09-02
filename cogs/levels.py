@@ -165,7 +165,8 @@ class Levels(commands.Cog):
 
         lb_data = get_levels_leaderboard(interaction.guild.id, limit=50)
         if not lb_data:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 "*No chat activity recorded for leveling yet. Start chatting!*",
                 ephemeral=True,
             )

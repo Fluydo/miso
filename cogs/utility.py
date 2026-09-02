@@ -23,9 +23,10 @@ class Utility(commands.Cog):
 
     @app_commands.command(name="ping", description="Check the bot latency.")
     async def ping(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
         latency_ms = self.bot.latency * 1000
         embed = ping_embed(latency_ms)
-        await interaction.response.send_message(embed=embed)
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="avatar", description="View full avatar of a user or yourself.")
     @app_commands.describe(user="The user whose avatar you want to view")
@@ -34,9 +35,10 @@ class Utility(commands.Cog):
         interaction: discord.Interaction,
         user: discord.User | discord.Member | None = None,
     ) -> None:
+        await interaction.response.defer()
         target = user or interaction.user
         embed = avatar_embed(target)
-        await interaction.response.send_message(embed=embed)
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="userinfo", description="View detailed user profile and permission information.")
     @app_commands.describe(user="The member to view information for")
@@ -46,29 +48,32 @@ class Utility(commands.Cog):
         interaction: discord.Interaction,
         user: discord.Member | None = None,
     ) -> None:
+        await interaction.response.defer()
         target = user or (interaction.user if isinstance(interaction.user, discord.Member) else None)
         if not target:
             return
 
         embed = user_info_embed(target)
-        await interaction.response.send_message(embed=embed)
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="serverinfo", description="View detailed information about this Discord server.")
     @app_commands.guild_only()
     async def serverinfo(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
         if not interaction.guild:
             return
 
         view = create_server_info_view(interaction.guild)
-        await interaction.response.send_message(view=view)
+        await interaction.followup.send(view=view)
 
     @app_commands.command(name="botinfo", description="View information and performance statistics about Miso.")
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_guild=True)
     async def botinfo(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
         uptime = time.time() - self.start_time
         embed = bot_info_embed(self.bot, uptime)
-        await interaction.response.send_message(embed=embed)
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="serverrules", description="Display official server guidelines and rules.")
     @app_commands.guild_only()
@@ -91,7 +96,8 @@ class Utility(commands.Cog):
         if interaction.guild.icon:
             embed.set_thumbnail(url=interaction.guild.icon.url)
         embed.set_footer(text=f"{interaction.guild.name} Community Standards")
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="supportticket", description="Quickly open a direct support inquiry.")
     @app_commands.guild_only()
@@ -120,9 +126,10 @@ class Utility(commands.Cog):
 
     @app_commands.command(name="help", description="Browse all Miso commands by category.")
     async def help(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(ephemeral=True)
         embed = help_overview_embed(self.bot)
         view = HelpView(self.bot)
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     @app_commands.command(name="website", description="Visit the Miso Hub dashboard to manage giveaways, play games, and more!")
     async def website(self, interaction: discord.Interaction) -> None:
@@ -139,7 +146,8 @@ class Utility(commands.Cog):
             color=config.COLOR_PRIMARY,
         )
         embed.set_footer(text=f"{config.BOT_NAME} Web Dashboard")
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed)
 
 
 async def setup(bot: commands.Bot) -> None:

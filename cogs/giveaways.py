@@ -180,7 +180,8 @@ class Giveaways(commands.Cog):
         try:
             td = parse_duration(duration)
         except ValueError as e:
-            await interaction.response.send_message(f"{config.EMOJI_CROSS} {e}", ephemeral=True)
+            await interaction.response.defer()
+            await interaction.followup.send(f"{config.EMOJI_CROSS} {e}", ephemeral=True)
             return
 
         end_ts = datetime.now(timezone.utc).timestamp() + td.total_seconds()
@@ -200,7 +201,8 @@ class Giveaways(commands.Cog):
         embed.set_footer(text=f"{config.BOT_NAME} Giveaways • Good luck!")
 
         # Initial message
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed)
         msg = await interaction.original_response()
 
         create_giveaway(
@@ -238,17 +240,20 @@ class Giveaways(commands.Cog):
             return
 
         if not message_id.strip().isdigit():
-            await interaction.response.send_message(f"{config.EMOJI_CROSS} Invalid message ID.", ephemeral=True)
+            await interaction.response.defer()
+            await interaction.followup.send(f"{config.EMOJI_CROSS} Invalid message ID.", ephemeral=True)
             return
 
         mid = int(message_id.strip())
         new_winner, prize = reroll_giveaway(mid)
 
         if not new_winner:
-            await interaction.response.send_message(f"{config.EMOJI_CROSS} {prize}", ephemeral=True)
+            await interaction.response.defer()
+            await interaction.followup.send(f"{config.EMOJI_CROSS} {prize}", ephemeral=True)
             return
 
-        await interaction.response.send_message(
+        await interaction.response.defer()
+        await interaction.followup.send(
             f"🎉 **Reroll!** The new winner for **{prize}** is <@{new_winner}>! Congratulations!"
         )
 

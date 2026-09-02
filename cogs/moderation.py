@@ -116,7 +116,8 @@ class Moderation(commands.Cog):
             return
 
         if not isinstance(channel, (discord.TextChannel, discord.ForumChannel)):
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=error_embed("Mod log channel must be a standard Text Channel or a Forum Channel."),
                 ephemeral=True,
             )
@@ -148,7 +149,8 @@ class Moderation(commands.Cog):
         if interaction.response.is_done():
             await interaction.followup.send(embed=embed, ephemeral=True)
         else:
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.response.defer()
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="disablemodlog", description="Disable moderation logging for this server.")
     @app_commands.guild_only()
@@ -159,7 +161,8 @@ class Moderation(commands.Cog):
 
         set_mod_log_channel_id(interaction.guild.id, None)
         embed = mod_log_disabled_embed(interaction.user.id)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="modlogstatus", description="Check the currently configured mod log channel.")
     @app_commands.guild_only()
@@ -170,7 +173,8 @@ class Moderation(commands.Cog):
 
         ch_id = get_mod_log_channel_id(interaction.guild.id)
         embed = mod_log_status_embed(ch_id)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     # ==========================================
     # /ban
@@ -196,7 +200,8 @@ class Moderation(commands.Cog):
 
         allowed, error_msg = can_moderate(interaction.user, user)
         if not allowed:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=hierarchy_error_embed(error_msg), ephemeral=True
             )
             return
@@ -214,7 +219,8 @@ class Moderation(commands.Cog):
                 delete_message_days=delete_message_days,
             )
         except discord.Forbidden:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=error_embed("Failed to ban member due to missing Discord permissions."),
                 ephemeral=True,
             )
@@ -226,7 +232,8 @@ class Moderation(commands.Cog):
             user_name=str(user),
             reason=reason,
         )
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed)
 
         # Visual Moderation Card
         file = None
@@ -281,12 +288,14 @@ class Moderation(commands.Cog):
         try:
             td = parse_duration(duration)
         except ValueError as e:
-            await interaction.response.send_message(embed=error_embed(str(e)), ephemeral=True)
+            await interaction.response.defer()
+            await interaction.followup.send(embed=error_embed(str(e)), ephemeral=True)
             return
 
         allowed, error_msg = can_moderate(interaction.user, user)
         if not allowed:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=hierarchy_error_embed(error_msg), ephemeral=True
             )
             return
@@ -306,7 +315,8 @@ class Moderation(commands.Cog):
                 reason=f"Tempban by {interaction.user} for {formatted_duration} | Reason: {reason}",
             )
         except discord.Forbidden:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=error_embed("Failed to ban member due to missing Discord permissions."),
                 ephemeral=True,
             )
@@ -321,7 +331,8 @@ class Moderation(commands.Cog):
             duration=formatted_duration,
             reason=reason,
         )
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed)
 
         file = None
         try:
@@ -371,7 +382,8 @@ class Moderation(commands.Cog):
 
         allowed, error_msg = can_moderate(interaction.user, user)
         if not allowed:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=hierarchy_error_embed(error_msg), ephemeral=True
             )
             return
@@ -385,7 +397,8 @@ class Moderation(commands.Cog):
         try:
             await user.kick(reason=f"Moderator: {interaction.user} | Reason: {reason}")
         except discord.Forbidden:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=error_embed("Failed to kick member due to missing Discord permissions."),
                 ephemeral=True,
             )
@@ -397,7 +410,8 @@ class Moderation(commands.Cog):
             user_name=str(user),
             reason=reason,
         )
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed)
 
         file = None
         try:
@@ -451,11 +465,13 @@ class Moderation(commands.Cog):
         try:
             td = parse_duration(duration)
         except ValueError as e:
-            await interaction.response.send_message(embed=error_embed(str(e)), ephemeral=True)
+            await interaction.response.defer()
+            await interaction.followup.send(embed=error_embed(str(e)), ephemeral=True)
             return
 
         if td.total_seconds() > 2419200:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=error_embed("Discord limits timeouts to a maximum of 28 days."),
                 ephemeral=True,
             )
@@ -463,7 +479,8 @@ class Moderation(commands.Cog):
 
         allowed, error_msg = can_moderate(interaction.user, user)
         if not allowed:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=hierarchy_error_embed(error_msg), ephemeral=True
             )
             return
@@ -479,7 +496,8 @@ class Moderation(commands.Cog):
         try:
             await user.timeout(td, reason=f"Moderator: {interaction.user} | Reason: {reason}")
         except discord.Forbidden:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=error_embed("Failed to apply timeout due to role hierarchy or permissions."),
                 ephemeral=True,
             )
@@ -492,7 +510,8 @@ class Moderation(commands.Cog):
             reason=reason,
             user_name=str(user),
         )
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed)
 
         file = None
         try:
@@ -542,7 +561,8 @@ class Moderation(commands.Cog):
 
         allowed, error_msg = can_moderate(interaction.user, user)
         if not allowed:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=hierarchy_error_embed(error_msg), ephemeral=True
             )
             return
@@ -550,7 +570,8 @@ class Moderation(commands.Cog):
         try:
             await user.timeout(None, reason=f"Timeout removed by {interaction.user} | Reason: {reason}")
         except discord.Forbidden:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=error_embed("Failed to remove timeout due to permissions or hierarchy."),
                 ephemeral=True,
             )
@@ -562,7 +583,8 @@ class Moderation(commands.Cog):
             reason=reason,
             user_name=str(user),
         )
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed)
 
         file = None
         try:
@@ -609,7 +631,8 @@ class Moderation(commands.Cog):
 
         allowed, error_msg = can_moderate(interaction.user, user)
         if not allowed:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=hierarchy_error_embed(error_msg), ephemeral=True
             )
             return
@@ -629,7 +652,8 @@ class Moderation(commands.Cog):
             warning_count=total_count,
             user_name=str(user),
         )
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed)
 
         file = None
         try:
@@ -680,7 +704,8 @@ class Moderation(commands.Cog):
             user_name=str(user),
             warnings=user_warns,
         )
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed)
 
     # ==========================================
     # /clearwarnings
@@ -704,7 +729,8 @@ class Moderation(commands.Cog):
             cleared_count=cleared,
             user_name=str(user),
         )
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed)
 
         log_embed = mod_action_log_embed(
             action="Warnings Cleared",
@@ -817,7 +843,8 @@ class Moderation(commands.Cog):
             return
 
         if not user_id.strip().isdigit():
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=error_embed("Invalid User ID. Please provide a numeric Discord User ID."),
                 ephemeral=True,
             )
@@ -828,13 +855,15 @@ class Moderation(commands.Cog):
         try:
             user = await self.bot.fetch_user(target_id)
         except discord.NotFound:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=error_embed("Could not find a Discord user with that ID."),
                 ephemeral=True,
             )
             return
         except discord.HTTPException:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=error_embed("Failed to retrieve user information from Discord."),
                 ephemeral=True,
             )
@@ -846,13 +875,15 @@ class Moderation(commands.Cog):
                 reason=f"Unbanned by {interaction.user} | Reason: {reason}",
             )
         except discord.NotFound:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=error_embed(f"**{user}** (`{user.id}`) is not currently banned in this server."),
                 ephemeral=True,
             )
             return
         except discord.Forbidden:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=error_embed("Failed to unban user due to missing Discord permissions."),
                 ephemeral=True,
             )
@@ -866,7 +897,8 @@ class Moderation(commands.Cog):
             user_name=str(user),
             reason=reason,
         )
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed)
 
         file = None
         try:
@@ -917,7 +949,8 @@ class Moderation(commands.Cog):
 
         target = channel or interaction.channel
         if not isinstance(target, discord.TextChannel):
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=error_embed("Slowmode can only be set on text channels."),
                 ephemeral=True,
             )
@@ -926,7 +959,8 @@ class Moderation(commands.Cog):
         try:
             await target.edit(slowmode_delay=seconds)
         except discord.Forbidden:
-            await interaction.response.send_message(
+            await interaction.response.defer()
+            await interaction.followup.send(
                 embed=error_embed("Missing permissions to edit that channel."),
                 ephemeral=True,
             )
@@ -952,7 +986,8 @@ class Moderation(commands.Cog):
             )
 
         embed = discord.Embed(description=desc, color=config.COLOR_SUCCESS)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
         log_embed = mod_action_log_embed(
             action="Slowmode Updated",

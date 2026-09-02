@@ -196,7 +196,8 @@ class AntiNuke(commands.Cog):
             ),
             color=config.COLOR_PRIMARY,
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.defer()
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @antinuke_group.command(name="enable", description="Enable Anti-Nuke protection on this server.")
     @app_commands.checks.has_permissions(administrator=True)
@@ -204,7 +205,8 @@ class AntiNuke(commands.Cog):
         if not interaction.guild:
             return
         set_antinuke_enabled(interaction.guild.id, True)
-        await interaction.response.send_message(f"{config.EMOJI_TICK} Anti-Nuke protection has been **enabled**.", ephemeral=True)
+        await interaction.response.defer()
+        await interaction.followup.send(f"{config.EMOJI_TICK} Anti-Nuke protection has been **enabled**.", ephemeral=True)
 
     @antinuke_group.command(name="disable", description="Disable Anti-Nuke protection on this server.")
     @app_commands.checks.has_permissions(administrator=True)
@@ -212,7 +214,8 @@ class AntiNuke(commands.Cog):
         if not interaction.guild:
             return
         set_antinuke_enabled(interaction.guild.id, False)
-        await interaction.response.send_message(f"{config.EMOJI_WARN} Anti-Nuke protection has been **disabled**.", ephemeral=True)
+        await interaction.response.defer()
+        await interaction.followup.send(f"{config.EMOJI_WARN} Anti-Nuke protection has been **disabled**.", ephemeral=True)
 
     @antinuke_group.command(name="setlimit", description="Set the action count threshold before quarantine.")
     @app_commands.describe(limit="Number of rapid actions allowed in 10s (minimum 2)")
@@ -221,10 +224,12 @@ class AntiNuke(commands.Cog):
         if not interaction.guild:
             return
         if limit < 2:
-            await interaction.response.send_message(f"{config.EMOJI_CROSS} Minimum limit is **2** actions.", ephemeral=True)
+            await interaction.response.defer()
+            await interaction.followup.send(f"{config.EMOJI_CROSS} Minimum limit is **2** actions.", ephemeral=True)
             return
         set_antinuke_threshold(interaction.guild.id, limit)
-        await interaction.response.send_message(f"{config.EMOJI_TICK} Anti-Nuke threshold updated to **{limit}** actions in 10s.", ephemeral=True)
+        await interaction.response.defer()
+        await interaction.followup.send(f"{config.EMOJI_TICK} Anti-Nuke threshold updated to **{limit}** actions in 10s.", ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:
