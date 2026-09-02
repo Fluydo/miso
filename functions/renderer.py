@@ -2050,6 +2050,7 @@ def generate_crash_gif(
 ) -> str:
     """
     Generate animated GIF for crash game with exponential curve.
+    Each frame is COMPLETELY REDRAWN from scratch - no overlapping.
     
     Args:
         phase: 'betting', 'running', 'supersonic', or 'crashed'
@@ -2065,6 +2066,7 @@ def generate_crash_gif(
     """
     from PIL import Image, ImageDraw, ImageFont
     import io
+    import math
     
     frames = []
     width, height = 700, 400
@@ -2073,52 +2075,37 @@ def generate_crash_gif(
     try:
         title_font = ImageFont.truetype("C:/Windows/Fonts/Poppins-SemiBold.ttf", 42)
         label_font = ImageFont.truetype("C:/Windows/Fonts/Poppins-Regular.ttf", 12)
-        bet_font = ImageFont.truetype("C:/Windows/Fonts/Poppins-Regular.ttf", 14)
     except:
         try:
             title_font = ImageFont.truetype("arial.ttf", 42)
             label_font = ImageFont.truetype("arial.ttf", 12)
-            bet_font = ImageFont.truetype("arial.ttf", 14)
         except:
             title_font = ImageFont.load_default()
             label_font = ImageFont.load_default()
-            bet_font = ImageFont.load_default()
     
     if phase == 'betting':
-        # Show betting phase with bet list
+        # Show betting phase with countdown
         for i in range(10):
-            img = Image.new('RGBA', (width, height), (0, 0, 0, 0))  # Transparent
+            # FRESH CANVAS - completely transparent
+            img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
             draw = ImageDraw.Draw(img)
             
             # Countdown in top-left
-            countdown_num = countdown - (i % countdown) if countdown > 0 else 0
+            countdown_num = countdown - (i % max(countdown, 1)) if countdown > 0 else 0
             countdown_text = f"Starting in {countdown_num}s"
-            draw.text((25, 20), countdown_text, fill=(200, 200, 200), font=title_font)
-            
-            # Show bet list below with proper spacing
-            if bets:
-                y_offset = 90  # Start below countdown
-                list_title = "Current Bets:"
-                draw.text((25, y_offset), list_title, fill=(150, 150, 150), font=bet_font)
-                y_offset += 35  # Space after title
-                
-                for bet in bets[:8]:  # Show max 8 bets
-                    username = bet.get('username', 'Unknown')[:15]
-                    amount = bet.get('amount', 0)
-                    bet_text = f"• {username}: {amount} coins"
-                    draw.text((35, y_offset), bet_text, fill=(180, 180, 180), font=label_font)
-                    y_offset += 28  # Proper line spacing
+            draw.text((20, 20), countdown_text, fill=(200, 200, 200), font=title_font)
             
             frames.append(img)
     
     elif phase in ['running', 'supersonic']:
-        # Generate exponential curve continuing from start_mult to multiplier
+        # Generate frames showing the CONTINUOUS curve from 1.0x to current multiplier
+        # Each frame is COMPLETELY FRESH - no previous frame data
         num_frames = 15
         is_supersonic = phase == 'supersonic'
         
-        # Graph shows from 1.0x to slightly above current multiplier
+        # Graph range - always show from 1.0x
         graph_min = 1.0
-        graph_max = max(multiplier * 1.2, 3.0)  # Show more range
+        graph_max = max(multiplier * 1.3, 3.0)
         
         margin_left = 80
         margin_right = 30
@@ -2126,7 +2113,11 @@ def generate_crash_gif(
         margin_bottom = 50
         
         for i in range(num_frames):
-            # Interpolate current multiplier
+            # FRESH CANVAS
+            img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(img)
+            
+            # Interpolate current multiplier for this frame
             t = i / (num_frames - 1) if num_frames > 1 else 1
             current_mult = start_mult + (multiplier - start_mult) * t
             
@@ -2138,52 +2129,46 @@ def generate_crash_gif(
                 line_color = (34, 197, 94)  # Green
                 text_color = (34, 197, 94)
             
-            img = Image.new('RGBA', (width, height), (0, 0, 0, 0))  # Transparent!
-            draw = ImageDraw.Draw(img)
-            
             graph_height = height - margin_top - margin_bottom
             graph_width = width - margin_left - margin_right
             
-            # Draw light gray grid lines
+            # Draw grid lines
             num_lines = 6
             for j in range(num_lines):
                 mult_value = graph_min + (graph_max - graph_min) * (j / (num_lines - 1))
                 y = height - margin_bottom - (j / (num_lines - 1)) * graph_height
                 
-                # Light gray grid line
+                # Grid line
                 draw.line(
                     [(margin_left, y), (width - margin_right, y)],
                     fill=(180, 180, 180, 255),
                     width=1
                 )
                 
-                # Label on left - light gray, properly spaced
+                # Label
                 label = f"{mult_value:.1f}x"
                 bbox = draw.textbbox((0, 0), label, font=label_font)
                 label_height = bbox[3] - bbox[1]
                 draw.text((10, y - label_height // 2), label, fill=(160, 160, 160), font=label_font)
             
-            # Draw TRUE exponential curve from 1.0x to current_mult
-            # Use the actual crash formula: 1.0 * (1.08 ^ time)
+            # Draw the FULL exponential curve from 1.0x to current_mult
+            # This is key - we draw the ENTIRE path every frame
             line_points = []
             
-            # Calculate time for start_mult and current_mult using inverse formula
-            # mult = 1.0 * (1.08 ^ t) => t = log(mult) / log(1.08)
-            import math
-            
             if current_mult > 1.0:
+                # Calculate time for current multiplier
                 time_at_current = math.log(current_mult) / math.log(1.08)
                 
-                # Generate points along the exponential curve
+                # Generate curve points
                 num_curve_points = 100
                 for j in range(num_curve_points):
                     # Time progress from 0 to time_at_current
                     time_t = (j / (num_curve_points - 1)) * time_at_current
                     
-                    # Calculate actual multiplier at this time using exponential formula
+                    # Calculate multiplier at this time point
                     curve_mult = 1.0 * (1.08 ** time_t)
                     
-                    # X position - represents time elapsed
+                    # X position - spread across width
                     x = margin_left + (time_t / time_at_current) * graph_width
                     
                     # Y position based on multiplier
@@ -2192,12 +2177,12 @@ def generate_crash_gif(
                         y = height - margin_bottom - (y_progress * graph_height)
                         line_points.append((x, y))
             else:
-                # Just starting, single point at 1.0x
+                # Just starting at 1.0x
                 x = margin_left
                 y = height - margin_bottom
                 line_points.append((x, y))
             
-            # Draw the exponential curve with glow
+            # Draw the curve with glow
             if len(line_points) > 1:
                 # Glow layers
                 for glow_width in [12, 8, 4]:
@@ -2207,19 +2192,24 @@ def generate_crash_gif(
                 
                 # Main line
                 draw.line(line_points, fill=line_color + (255,), width=3)
+                
+                # Rocket emoji at the end
+                if line_points:
+                    rocket_x, rocket_y = line_points[-1]
+                    draw.text((rocket_x - 10, rocket_y - 25), "🚀", font=title_font)
             
-            # Multiplier in top-left (Poppins font) - single line, no overlap
+            # Multiplier in top-left - FRESH each frame (no overlap)
             mult_text = f"{current_mult:.2f}x"
             draw.text((25, 20), mult_text, fill=text_color, font=title_font)
             
             frames.append(img)
     
     else:  # crashed
-        # Show crash with full exponential curve
+        # Show crash with full curve and explosion
         num_frames = 12
         
         graph_min = 1.0
-        graph_max = max(multiplier * 1.2, 3.0)
+        graph_max = max(multiplier * 1.3, 3.0)
         
         margin_left = 80
         margin_right = 30
@@ -2227,13 +2217,14 @@ def generate_crash_gif(
         margin_bottom = 50
         
         for i in range(num_frames):
-            img = Image.new('RGBA', (width, height), (0, 0, 0, 0))  # Transparent
+            # FRESH CANVAS
+            img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
             draw = ImageDraw.Draw(img)
             
             graph_height = height - margin_top - margin_bottom
             graph_width = width - margin_left - margin_right
             
-            # Grid lines - light gray
+            # Grid lines
             num_lines = 6
             for j in range(num_lines):
                 mult_value = graph_min + (graph_max - graph_min) * (j / (num_lines - 1))
@@ -2250,8 +2241,7 @@ def generate_crash_gif(
                 label_height = bbox[3] - bbox[1]
                 draw.text((10, y - label_height // 2), label, fill=(160, 160, 160), font=label_font)
             
-            # Draw true exponential curve up to crash point
-            import math
+            # Draw full curve up to crash point
             line_points = []
             
             if multiplier > 1.0:
@@ -2296,17 +2286,17 @@ def generate_crash_gif(
                     fill=(255, 255, 255, explosion_alpha)
                 )
             
-            # Crashed multiplier in top-left - single line
+            # Crashed multiplier in top-left - FRESH each frame
             mult_text = f"{multiplier:.2f}x"
             draw.text((25, 20), mult_text, fill=(220, 50, 50), font=title_font)
             
-            # "CRASHED" subtitle below, no overlap
+            # "CRASHED" subtitle
             try:
                 subtitle_font = ImageFont.truetype("C:/Windows/Fonts/Poppins-Regular.ttf", 16)
             except:
                 subtitle_font = label_font
             
-            draw.text((25, 70), "CRASHED!", fill=(255, 100, 100), font=subtitle_font)
+            draw.text((25, 70), "💥 CRASHED!", fill=(255, 100, 100), font=subtitle_font)
             
             frames.append(img)
     

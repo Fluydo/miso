@@ -350,26 +350,8 @@ class Crash(commands.Cog):
             # Add website recommendation
             embed.description += "\n\n-# We recommend you to play crash through the [website](https://miso-dashboard-iota.vercel.app/games/crash)"
             
-            # Attach generated GIF and bet results image
-            gif_file = discord.File(temp_gif_path, filename="crash.gif")
-            bets_file = discord.File(temp_bets_path, filename="crash_bets.png")
-            
+            # Set the GIF as main image
             embed.set_image(url="attachment://crash.gif")
-            embed.set_thumbnail(url="attachment://crash_bets.png")
-            
-            # Add bet list as embed field
-            if bet_list:
-                bet_text = ""
-                for i, bet in enumerate(bet_list[:10], 1):
-                    status_emoji = "⏳" if bet['status'] == 'active' else ("✅" if bet['status'] == 'cashed_out' else "❌")
-                    mult_text = f" @ {bet['multiplier']:.2f}x" if bet['status'] == 'cashed_out' else ""
-                    bet_text += f"`#{i}` **{bet['username'][:15]}** — {bet['amount']:,} 🪙 {status_emoji}{mult_text}\n"
-                
-                embed.add_field(
-                    name=f"🎯 Active Bets ({len(bet_list)})",
-                    value=bet_text or "No bets yet",
-                    inline=False
-                )
             
             # Get bet count
             bet_count = len(bet_list)
@@ -378,13 +360,29 @@ class Crash(commands.Cog):
             # Create view with buttons
             view = CrashButtons(self.bot, self.supabase)
             
-            # Update message
+            # Prepare files
+            gif_file = discord.File(temp_gif_path, filename="crash.gif")
+            bets_file = discord.File(temp_bets_path, filename="crash_bets.png")
+            
+            # Update message with embed + both images
             try:
                 message = await channel.fetch_message(self.live_message_id)
-                await message.edit(embed=embed, attachments=[gif_file, bets_file], view=view)
+                # Edit with new files
+                await message.edit(
+                    embed=embed,
+                    attachments=[gif_file, bets_file],
+                    view=view
+                )
             except discord.NotFound:
-                # Message deleted, create new one
-                new_msg = await channel.send(embed=embed, files=[gif_file, bets_file], view=view)
+                # Message deleted, create new one with BOTH images visible
+                # First send the embed with GIF
+                new_msg = await channel.send(
+                    embed=embed,
+                    file=gif_file,
+                    view=view
+                )
+                # Then send the bets image in a follow-up (so it appears below)
+                await channel.send(file=bets_file)
                 self.live_message_id = new_msg.id
             
             # Clean up temp files
