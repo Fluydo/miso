@@ -2050,7 +2050,7 @@ def generate_crash_gif(
 ) -> str:
     """
     Generate animated GIF using Puppeteer + HTML renderer.
-    Much better quality than PIL-based generation.
+    Falls back to PIL if Node.js fails.
     """
     import subprocess
     import os
@@ -2072,7 +2072,7 @@ def generate_crash_gif(
     mapped_phase = phase_map.get(phase, 'running')
     
     try:
-        # Call Node.js script to generate GIF
+        # Call Node.js script to generate GIF with shorter timeout
         result = subprocess.run(
             ["node", node_script, mapped_phase, str(multiplier), output_path],
             cwd=bot_dir,
@@ -2080,58 +2080,90 @@ def generate_crash_gif(
             text=True,
             encoding='utf-8',
             errors='ignore',  # Ignore decode errors
-            timeout=30
+            timeout=10  # Reduced timeout to 10 seconds
         )
         
-        if result.returncode != 0:
-            print(f"[GIF] Error generating GIF: {result.stderr}")
-            # Fall back to simple generation
+        if result.returncode == 0 and os.path.exists(output_path):
+            print(f"[GIF] Generated: {output_path}")
+            return output_path
+        else:
+            print(f"[GIF] Node.js failed (returncode {result.returncode}), using fallback")
             return _generate_simple_gif(phase, multiplier, output_path)
         
-        print(f"[GIF] Generated: {output_path}")
-        return output_path
-        
+    except subprocess.TimeoutExpired:
+        print(f"[GIF] Node.js timed out, using PIL fallback")
+        return _generate_simple_gif(phase, multiplier, output_path)
     except Exception as e:
         print(f"[GIF] Failed to generate with Node.js: {e}")
-        # Fall back to simple generation
         return _generate_simple_gif(phase, multiplier, output_path)
 
 
 def _generate_simple_gif(phase: str, multiplier: float, output_path: str) -> str:
-    """Fallback: generate a simple static image as GIF"""
+    """Fallback: generate a nice-looking static image as GIF using PIL"""
     from PIL import Image, ImageDraw, ImageFont
     
-    img = Image.new('RGBA', (700, 400), (0, 0, 0, 0))
+    # Create image with transparent background
+    img = Image.new('RGBA', (700, 400), (30, 31, 35, 255))  # Discord dark background
     draw = ImageDraw.Draw(img)
     
     try:
-        font = ImageFont.truetype("arial.ttf", 48)
+        # Try to load a nice font
+        font_large = ImageFont.truetype("arial.ttf", 120)
+        font_small = ImageFont.truetype("arial.ttf", 36)
     except:
-        font = ImageFont.load_default()
+        font_large = ImageFont.load_default()
+        font_small = ImageFont.load_default()
     
-    # Simple text display
-    color_map = {
-        'betting': (254, 231, 92),
-        'running': (34, 197, 94),
-        'supersonic': (255, 140, 0),
-        'crashed': (220, 50, 50)
+    # Colors based on phase
+    phase_config = {
+        'betting': {
+            'color': (254, 231, 92),  # Yellow
+            'emoji': '🎰',
+            'text': 'BETTING'
+        },
+        'running': {
+            'color': (34, 197, 94),  # Green
+            'emoji': '🚀',
+            'text': f'{multiplier:.2f}x'
+        },
+        'supersonic': {
+            'color': (255, 140, 0),  # Orange
+            'emoji': '🔥',
+            'text': f'{multiplier:.2f}x'
+        },
+        'crashed': {
+            'color': (220, 50, 50),  # Red
+            'emoji': '💥',
+            'text': f'{multiplier:.2f}x'
+        }
     }
     
-    color = color_map.get(phase, (255, 255, 255))
-    text = f"{multiplier:.2f}x"
+    config = phase_config.get(phase, phase_config['running'])
     
-    bbox = draw.textbbox((0, 0), text, font=font)
+    # Draw main multiplier text
+    main_text = config['text']
+    bbox = draw.textbbox((0, 0), main_text, font=font_large)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
     
     x = (700 - text_width) // 2
     y = (400 - text_height) // 2
     
-    draw.text((x, y), text, fill=color, font=font)
+    # Draw shadow for depth
+    draw.text((x + 3, y + 3), main_text, fill=(0, 0, 0, 180), font=font_large)
+    # Draw main text
+    draw.text((x, y), main_text, fill=config['color'], font=font_large)
     
-    # Save as single-frame GIF
-    img.save(output_path, 'GIF', duration=1000, loop=0)
+    # Draw phase label at top
+    label_text = f"{config['emoji']} {phase.upper()}"
+    bbox2 = draw.textbbox((0, 0), label_text, font=font_small)
+    label_width = bbox2[2] - bbox2[0]
+    draw.text(((700 - label_width) // 2, 30), label_text, fill=(200, 200, 200), font=font_small)
     
+    # Save as GIF
+    img.save(output_path, 'GIF', duration=100, loop=0)
+    
+    print(f"[GIF] Created PIL fallback: {output_path}")
     return output_path
 
 

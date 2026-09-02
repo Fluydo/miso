@@ -525,17 +525,14 @@ class Crash(commands.Cog):
     @app_commands.command(name="crashsetup", description="Setup crash game live channel")
     @app_commands.default_permissions(administrator=True)
     async def crash_setup(self, interaction: discord.Interaction, channel: discord.TextChannel):
-        """Admin command to set up live crash channel"""
+        """Admin command to set up live crash channel - Component v2 (NO EMBED)"""
         self.crash_channel_id = channel.id
         
-        # Create initial message
-        embed = create_embed(
-            title="🚀 Crash Game Live",
-            description="This message will update every 2 seconds with the current game status.",
-            color=discord.Color.blurple()
-        )
+        # Create initial message (NO EMBED - just content + buttons)
+        content = "🚀 **CRASH GAME LIVE**\n\nThis message will update every 2 seconds with the current game status."
+        view = CrashButtons(self.bot, self.supabase)
         
-        msg = await channel.send(embed=embed)
+        msg = await channel.send(content=content, view=view)
         self.live_message_id = msg.id
         
         await interaction.response.send_message(
