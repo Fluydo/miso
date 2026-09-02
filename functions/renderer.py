@@ -2093,20 +2093,21 @@ def generate_crash_gif(
             # Countdown in top-left
             countdown_num = countdown - (i % countdown) if countdown > 0 else 0
             countdown_text = f"Starting in {countdown_num}s"
-            draw.text((20, 20), countdown_text, fill=(200, 200, 200), font=title_font)
+            draw.text((25, 20), countdown_text, fill=(200, 200, 200), font=title_font)
             
-            # Show bet list below
+            # Show bet list below with proper spacing
             if bets:
-                y_offset = 80
-                draw.text((20, y_offset), "Current Bets:", fill=(150, 150, 150), font=bet_font)
-                y_offset += 30
+                y_offset = 90  # Start below countdown
+                list_title = "Current Bets:"
+                draw.text((25, y_offset), list_title, fill=(150, 150, 150), font=bet_font)
+                y_offset += 35  # Space after title
                 
                 for bet in bets[:8]:  # Show max 8 bets
                     username = bet.get('username', 'Unknown')[:15]
                     amount = bet.get('amount', 0)
                     bet_text = f"• {username}: {amount} coins"
-                    draw.text((30, y_offset), bet_text, fill=(180, 180, 180), font=label_font)
-                    y_offset += 25
+                    draw.text((35, y_offset), bet_text, fill=(180, 180, 180), font=label_font)
+                    y_offset += 28  # Proper line spacing
             
             frames.append(img)
     
@@ -2117,12 +2118,12 @@ def generate_crash_gif(
         
         # Graph shows from 1.0x to slightly above current multiplier
         graph_min = 1.0
-        graph_max = multiplier + 1.0
+        graph_max = max(multiplier * 1.2, 3.0)  # Show more range
         
-        margin_left = 60
+        margin_left = 80
         margin_right = 30
-        margin_top = 80
-        margin_bottom = 40
+        margin_top = 90
+        margin_bottom = 50
         
         for i in range(num_frames):
             # Interpolate current multiplier
@@ -2144,7 +2145,7 @@ def generate_crash_gif(
             graph_width = width - margin_left - margin_right
             
             # Draw light gray grid lines
-            num_lines = 5
+            num_lines = 6
             for j in range(num_lines):
                 mult_value = graph_min + (graph_max - graph_min) * (j / (num_lines - 1))
                 y = height - margin_bottom - (j / (num_lines - 1)) * graph_height
@@ -2156,35 +2157,45 @@ def generate_crash_gif(
                     width=1
                 )
                 
-                # Label on left - light gray
+                # Label on left - light gray, properly spaced
                 label = f"{mult_value:.1f}x"
-                draw.text((8, y - 8), label, fill=(160, 160, 160), font=label_font)
+                bbox = draw.textbbox((0, 0), label, font=label_font)
+                label_height = bbox[3] - bbox[1]
+                draw.text((10, y - label_height // 2), label, fill=(160, 160, 160), font=label_font)
             
-            # Draw EXPONENTIAL curve from 1.0x to current_mult
-            # This is the key - we show the ENTIRE curve building up
+            # Draw TRUE exponential curve from 1.0x to current_mult
+            # Use the actual crash formula: 1.0 * (1.08 ^ time)
             line_points = []
-            num_curve_points = 100  # High resolution for smooth exponential
             
-            for j in range(num_curve_points):
-                curve_t = j / (num_curve_points - 1)
+            # Calculate time for start_mult and current_mult using inverse formula
+            # mult = 1.0 * (1.08 ^ t) => t = log(mult) / log(1.08)
+            import math
+            
+            if current_mult > 1.0:
+                time_at_current = math.log(current_mult) / math.log(1.08)
                 
-                # Exponential curve: simulate how crash multiplier grows
-                # Maps from 1.0x at start to current_mult at end
-                if current_mult > 1.0:
-                    # Use exponential interpolation for realistic curve
-                    # mult = 1.0 * (1.08 ^ time) - matches actual crash formula
-                    curve_mult = 1.0 + (current_mult - 1.0) * (curve_t ** 0.8)  # Slightly exponential
-                else:
-                    curve_mult = 1.0
-                
-                # X position - full width represents the time elapsed
-                x = margin_left + (curve_t * graph_width)
-                
-                # Y position based on multiplier
-                if curve_mult <= graph_max and curve_mult >= graph_min:
-                    y_progress = (curve_mult - graph_min) / (graph_max - graph_min)
-                    y = height - margin_bottom - (y_progress * graph_height)
-                    line_points.append((x, y))
+                # Generate points along the exponential curve
+                num_curve_points = 100
+                for j in range(num_curve_points):
+                    # Time progress from 0 to time_at_current
+                    time_t = (j / (num_curve_points - 1)) * time_at_current
+                    
+                    # Calculate actual multiplier at this time using exponential formula
+                    curve_mult = 1.0 * (1.08 ** time_t)
+                    
+                    # X position - represents time elapsed
+                    x = margin_left + (time_t / time_at_current) * graph_width
+                    
+                    # Y position based on multiplier
+                    if curve_mult <= graph_max and curve_mult >= graph_min:
+                        y_progress = (curve_mult - graph_min) / (graph_max - graph_min)
+                        y = height - margin_bottom - (y_progress * graph_height)
+                        line_points.append((x, y))
+            else:
+                # Just starting, single point at 1.0x
+                x = margin_left
+                y = height - margin_bottom
+                line_points.append((x, y))
             
             # Draw the exponential curve with glow
             if len(line_points) > 1:
@@ -2197,9 +2208,9 @@ def generate_crash_gif(
                 # Main line
                 draw.line(line_points, fill=line_color + (255,), width=3)
             
-            # Multiplier in top-left (Poppins font)
+            # Multiplier in top-left (Poppins font) - single line, no overlap
             mult_text = f"{current_mult:.2f}x"
-            draw.text((20, 15), mult_text, fill=text_color, font=title_font)
+            draw.text((25, 20), mult_text, fill=text_color, font=title_font)
             
             frames.append(img)
     
@@ -2208,12 +2219,12 @@ def generate_crash_gif(
         num_frames = 12
         
         graph_min = 1.0
-        graph_max = multiplier + 1.0
+        graph_max = max(multiplier * 1.2, 3.0)
         
-        margin_left = 60
+        margin_left = 80
         margin_right = 30
-        margin_top = 80
-        margin_bottom = 40
+        margin_top = 90
+        margin_bottom = 50
         
         for i in range(num_frames):
             img = Image.new('RGBA', (width, height), (0, 0, 0, 0))  # Transparent
@@ -2223,7 +2234,7 @@ def generate_crash_gif(
             graph_width = width - margin_left - margin_right
             
             # Grid lines - light gray
-            num_lines = 5
+            num_lines = 6
             for j in range(num_lines):
                 mult_value = graph_min + (graph_max - graph_min) * (j / (num_lines - 1))
                 y = height - margin_bottom - (j / (num_lines - 1)) * graph_height
@@ -2235,26 +2246,28 @@ def generate_crash_gif(
                 )
                 
                 label = f"{mult_value:.1f}x"
-                draw.text((8, y - 8), label, fill=(160, 160, 160), font=label_font)
+                bbox = draw.textbbox((0, 0), label, font=label_font)
+                label_height = bbox[3] - bbox[1]
+                draw.text((10, y - label_height // 2), label, fill=(160, 160, 160), font=label_font)
             
-            # Draw full exponential curve up to crash point
+            # Draw true exponential curve up to crash point
+            import math
             line_points = []
-            num_curve_points = 100
             
-            for j in range(num_curve_points):
-                curve_t = j / (num_curve_points - 1)
+            if multiplier > 1.0:
+                time_at_crash = math.log(multiplier) / math.log(1.08)
                 
-                if multiplier > 1.0:
-                    curve_mult = 1.0 + (multiplier - 1.0) * (curve_t ** 0.8)
-                else:
-                    curve_mult = 1.0
-                
-                x = margin_left + (curve_t * graph_width)
-                
-                if curve_mult <= graph_max and curve_mult >= graph_min:
-                    y_progress = (curve_mult - graph_min) / (graph_max - graph_min)
-                    y = height - margin_bottom - (y_progress * graph_height)
-                    line_points.append((x, y))
+                num_curve_points = 100
+                for j in range(num_curve_points):
+                    time_t = (j / (num_curve_points - 1)) * time_at_crash
+                    curve_mult = 1.0 * (1.08 ** time_t)
+                    
+                    x = margin_left + (time_t / time_at_crash) * graph_width
+                    
+                    if curve_mult <= graph_max and curve_mult >= graph_min:
+                        y_progress = (curve_mult - graph_min) / (graph_max - graph_min)
+                        y = height - margin_bottom - (y_progress * graph_height)
+                        line_points.append((x, y))
             
             # Draw red curve
             if len(line_points) > 1:
@@ -2283,17 +2296,17 @@ def generate_crash_gif(
                     fill=(255, 255, 255, explosion_alpha)
                 )
             
-            # Crashed multiplier in top-left
+            # Crashed multiplier in top-left - single line
             mult_text = f"{multiplier:.2f}x"
-            draw.text((20, 15), mult_text, fill=(220, 50, 50), font=title_font)
+            draw.text((25, 20), mult_text, fill=(220, 50, 50), font=title_font)
             
-            # "CRASHED" subtitle
+            # "CRASHED" subtitle below, no overlap
             try:
-                subtitle_font = ImageFont.truetype("C:/Windows/Fonts/Poppins-Regular.ttf", 18)
+                subtitle_font = ImageFont.truetype("C:/Windows/Fonts/Poppins-Regular.ttf", 16)
             except:
                 subtitle_font = label_font
             
-            draw.text((20, 62), "CRASHED!", fill=(255, 100, 100), font=subtitle_font)
+            draw.text((25, 70), "CRASHED!", fill=(255, 100, 100), font=subtitle_font)
             
             frames.append(img)
     
