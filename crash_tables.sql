@@ -31,6 +31,12 @@ CREATE INDEX IF NOT EXISTS idx_crash_bets_user ON crash_bets(user_id);
 ALTER TABLE crash_games ENABLE ROW LEVEL SECURITY;
 ALTER TABLE crash_bets ENABLE ROW LEVEL SECURITY;
 
--- Allow public read access (adjust as needed)
+-- Allow public read access
 CREATE POLICY "Allow public read on crash_games" ON crash_games FOR SELECT USING (true);
 CREATE POLICY "Allow public read on crash_bets" ON crash_bets FOR SELECT USING (true);
+
+-- Allow authenticated users to insert bets
+CREATE POLICY "Allow authenticated insert on crash_bets" ON crash_bets FOR INSERT WITH CHECK (true);
+
+-- Allow authenticated users to update their own bets (for cashout)
+CREATE POLICY "Allow authenticated update on crash_bets" ON crash_bets FOR UPDATE USING (true);

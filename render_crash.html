@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crash Graph</title>
+<style>
+* {
+    box-sizing: border-box;
+}
+html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+}
+body {
+    font-family: 'Poppins', Arial, sans-serif;
+}
+#graph {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+}
+canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+#multiplier {
+    position: absolute;
+    left: 5%;
+    top: 5%;
+    color: white;
+    font-size: clamp(32px, 4vw, 58px);
+    font-weight: 800;
+    letter-spacing: -2px;
+    white-space: nowrap;
+    transition: color 0.12s ease;
+}
+#rocket {
+    position: absolute;
+    width: 48px;
+    height: 48px;
+    transform-origin: center center;
+    font-size: 32px;
+    will-change: left, top, transform;
+}
+#status {
+    position: absolute;
+    left: 5%;
+    bottom: 5%;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 16px;
+    font-weight: 600;
+}
+</style>
+</head>
+<body>
+<div id="graph">
+    <canvas id="canvas"></canvas>
+    <div id="multiplier">1.00x</div>
+    <div id="rocket">🚀</div>
+    <div id="status">Betting Phase</div>
+</div>
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const multiplierText = document.getElementById("multiplier");
+const rocket = document.getElementById("rocket");
+const statusText = document.getElementById("status");
+
+/* SETTINGS */
+const PADDING = 0.05;
+const GROWTH_SPEED = 0.075; // matches 1.08^t
+const START_VISIBLE_MAX = 5.5;
+const EXPAND_THRESHOLD = 0.84;
+const EXPAND_SPEED = 0.018;
+
+/* STATE - controlled by URL params */
+let width = 0;
+let height = 0;
+let dpr = window.devicePixelRatio || 1;
+let currentMultiplier = 1;
+let visibleMax = START_VISIBLE_MAX;
+let crashed = false;
+let phase = 'betting'; // betting, running, supersonic, crashed
+
+/* Parse URL params */
+const params = new URLSearchParams(window.location.search);
+if (params.has('multiplier')) {
+    currentMultiplier = parseFloat(params.get('multiplier'));
+}
+if (params.has('phase')) {
+    phase = params.get('phase');
+    crashed = phase === 'crashed';
+}
+
+/* RESIZE */
+const graphEl = document.getElementById("graph");
+
+function applySize(w, h) {
+    width = w;
+    height = h;
+    dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = width + "px";
+    canvas.style.height = height + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function resize() {
+    const rect = graphEl.getBoundingClientRect();
+    applySize(rect.width, rect.height);
+}
+
+const resizeObserver = new ResizeObserver(entries => {
+    for (const entry of entries) {
+        const box = entry.contentBoxSize ? entry.contentBoxSize[0] : null;
+        if (box) {
+            applySize(box.inlineSize, box.blockSize);
+        } else {
+            resize();
+        }
+    }
+});
+
+resizeObserver.observe(graphEl);
+window.addEventListener("resize", resize);
+resize();
+
+function getPadding() {
+    return {
+        x: width * PADDING,
+        y: height * PADDING
+    };
+}
+
+function curvePoint(multiplier) {
+    const padding = getPadding();
+    const graphWidth = width - padding.x * 2;
+    const graphHeight = height - padding.y * 2;
+    
+    const multiplierLog = Math.log(Math.max(multiplier, 1));
+    const visibleLog = Math.log(Math.max(visibleMax, 1.01));
+    
+    let t = multiplierLog / visibleLog;
+    t = Math.max(0, Math.min(1, t));
+    
+    const x = padding.x + graphWidth * t;
+    const curve = Math.pow(t, 1.55);
+    const y = height - padding.y - curve * graphHeight;
+    
+    return { x, y };
+}
+
+function getGuideValues() {
+    const values = [1, 2, 5, 10, 15, 20, 25, 30, 35];
+    return values.filter(value => value <= visibleMax);
+}
+
+function drawGuides() {
+    const padding = getPadding();
+    const guides = getGuideValues();
+    
+    ctx.save();
+    for (const multiplier of guides) {
+        const point = curvePoint(multiplier);
+        const y = point.y;
+        
+        if (y < padding.y || y > height - padding.y) continue;
+        
+        ctx.beginPath();
+        ctx.moveTo(padding.x, y);
+        ctx.lineTo(width - padding.x, y);
+        ctx.strokeStyle = "rgba(255,255,255,0.12)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 7]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.font = "600 12px Arial";
+        ctx.fillStyle = "rgba(255,255,255,0.42)";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(multiplier + "x", padding.x, y);
+    }
+    ctx.restore();
+}
+
+function drawGraph() {
+    ctx.clearRect(0, 0, width, height);
+    drawGuides();
+    
+    const points = [];
+    const steps = 220;
+    
+    for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const currentLog = Math.log(Math.max(currentMultiplier, 1));
+        const value = Math.exp(currentLog * t);
+        points.push(curvePoint(value));
+    }
+    
+    if (points.length < 2) return;
+    
+    const padding = getPadding();
+    
+    // Fill area
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, height - padding.y);
+    for (const point of points) {
+        ctx.lineTo(point.x, point.y);
+    }
+    const last = points[points.length - 1];
+    ctx.lineTo(last.x, height - padding.y);
+    ctx.closePath();
+    
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    if (crashed) {
+        gradient.addColorStop(0, "rgba(255,55,75,0.16)");
+        gradient.addColorStop(1, "rgba(255,55,75,0)");
+    } else if (phase === 'supersonic') {
+        gradient.addColorStop(0, "rgba(255,140,0,0.18)");
+        gradient.addColorStop(1, "rgba(255,140,0,0)");
+    } else {
+        gradient.addColorStop(0, "rgba(34,197,94,0.18)");
+        gradient.addColorStop(1, "rgba(34,197,94,0)");
+    }
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    
+    // Glow line
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (const point of points) {
+        ctx.lineTo(point.x, point.y);
+    }
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = crashed
+        ? "rgba(255,55,75,0.18)"
+        : phase === 'supersonic'
+        ? "rgba(255,140,0,0.20)"
+        : "rgba(34,197,94,0.20)";
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = crashed
+        ? "rgba(255,55,75,0.75)"
+        : phase === 'supersonic'
+        ? "rgba(255,140,0,0.75)"
+        : "rgba(34,197,94,0.75)";
+    ctx.stroke();
+    
+    // Main line
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (const point of points) {
+        ctx.lineTo(point.x, point.y);
+    }
+    ctx.lineWidth = 3;
+    ctx.shadowBlur = 8;
+    ctx.strokeStyle = crashed
+        ? "#ff465c"
+        : phase === 'supersonic'
+        ? "#ff8c00"
+        : "#22c55e";
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+}
+
+function updateRocket() {
+    const point = curvePoint(currentMultiplier);
+    const next = curvePoint(currentMultiplier * 1.002 + 0.001);
+    
+    const angle = Math.atan2(
+        next.y - point.y,
+        next.x - point.x
+    ) * 180 / Math.PI;
+    
+    rocket.style.left = (point.x - 24) + "px";
+    rocket.style.top = (point.y - 24) + "px";
+    rocket.style.transform = `rotate(${angle + 90}deg)`;
+    
+    if (crashed) {
+        rocket.textContent = "💥";
+    } else {
+        rocket.textContent = "🚀";
+    }
+}
+
+function updateStatus() {
+    if (crashed) {
+        statusText.textContent = "CRASHED!";
+        statusText.style.color = "#ff465c";
+    } else if (phase === 'betting') {
+        statusText.textContent = "Betting Phase";
+        statusText.style.color = "rgba(254, 231, 92, 0.8)";
+    } else if (phase === 'supersonic') {
+        statusText.textContent = "SUPERSONIC";
+        statusText.style.color = "#ff8c00";
+    } else {
+        statusText.textContent = "Flying";
+        statusText.style.color = "#22c55e";
+    }
+}
+
+function render() {
+    multiplierText.textContent = currentMultiplier.toFixed(2) + "x";
+    multiplierText.style.color = crashed
+        ? "#ff465c"
+        : phase === 'supersonic'
+        ? "#ff8c00"
+        : "#ffffff";
+    
+    drawGraph();
+    updateRocket();
+    updateStatus();
+    
+    // Signal ready for screenshot
+    window.renderComplete = true;
+}
+
+// Initial render
+setTimeout(render, 100);
+</script>
+</body>
+</html>

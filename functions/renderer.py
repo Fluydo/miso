@@ -2049,268 +2049,86 @@ def generate_crash_gif(
     output_path: str = "crash_temp.gif"
 ) -> str:
     """
-    Generate animated GIF for crash game with exponential curve.
-    Each frame is COMPLETELY REDRAWN from scratch - no overlapping.
-    
-    Args:
-        phase: 'betting', 'running', 'supersonic', or 'crashed'
-        multiplier: Current multiplier (for running/supersonic phase)
-        start_mult: Starting multiplier for continuity (where last GIF left off)
-        countdown: Seconds remaining in betting phase
-        bets: List of current bets (for betting phase)
-        fps: Frames per second (default 15 for smooth animation)
-        output_path: Where to save the GIF
-    
-    Returns:
-        Path to generated GIF file
+    Generate animated GIF using Puppeteer + HTML renderer.
+    Much better quality than PIL-based generation.
     """
-    from PIL import Image, ImageDraw, ImageFont
-    import io
-    import math
+    import subprocess
+    import os
     
-    frames = []
-    width, height = 700, 400
+    # Get the directory where this script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    bot_dir = os.path.dirname(script_dir)  # Go up one level to bot root
     
-    # Try to load Poppins font, fallback to Arial
+    node_script = os.path.join(bot_dir, "generate_gif.js")
+    
+    # Map phase names
+    phase_map = {
+        'betting': 'betting',
+        'running': 'running',
+        'supersonic': 'supersonic',
+        'crashed': 'crashed'
+    }
+    
+    mapped_phase = phase_map.get(phase, 'running')
+    
     try:
-        title_font = ImageFont.truetype("C:/Windows/Fonts/Poppins-SemiBold.ttf", 42)
-        label_font = ImageFont.truetype("C:/Windows/Fonts/Poppins-Regular.ttf", 12)
-    except:
-        try:
-            title_font = ImageFont.truetype("arial.ttf", 42)
-            label_font = ImageFont.truetype("arial.ttf", 12)
-        except:
-            title_font = ImageFont.load_default()
-            label_font = ImageFont.load_default()
-    
-    if phase == 'betting':
-        # Show betting phase with countdown
-        for i in range(10):
-            # FRESH CANVAS - completely transparent
-            img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
-            draw = ImageDraw.Draw(img)
-            
-            # Countdown in top-left
-            countdown_num = countdown - (i % max(countdown, 1)) if countdown > 0 else 0
-            countdown_text = f"Starting in {countdown_num}s"
-            draw.text((20, 20), countdown_text, fill=(200, 200, 200), font=title_font)
-            
-            frames.append(img)
-    
-    elif phase in ['running', 'supersonic']:
-        # Generate frames showing the CONTINUOUS curve from 1.0x to current multiplier
-        # Each frame is COMPLETELY FRESH - no previous frame data
-        num_frames = 15
-        is_supersonic = phase == 'supersonic'
-        
-        # Graph range - always show from 1.0x
-        graph_min = 1.0
-        graph_max = max(multiplier * 1.3, 3.0)
-        
-        margin_left = 80
-        margin_right = 30
-        margin_top = 90
-        margin_bottom = 50
-        
-        for i in range(num_frames):
-            # FRESH CANVAS
-            img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
-            draw = ImageDraw.Draw(img)
-            
-            # Interpolate current multiplier for this frame
-            t = i / (num_frames - 1) if num_frames > 1 else 1
-            current_mult = start_mult + (multiplier - start_mult) * t
-            
-            # Colors
-            if is_supersonic:
-                line_color = (255, 140, 0)  # Orange
-                text_color = (255, 140, 0)
-            else:
-                line_color = (34, 197, 94)  # Green
-                text_color = (34, 197, 94)
-            
-            graph_height = height - margin_top - margin_bottom
-            graph_width = width - margin_left - margin_right
-            
-            # Draw grid lines
-            num_lines = 6
-            for j in range(num_lines):
-                mult_value = graph_min + (graph_max - graph_min) * (j / (num_lines - 1))
-                y = height - margin_bottom - (j / (num_lines - 1)) * graph_height
-                
-                # Grid line
-                draw.line(
-                    [(margin_left, y), (width - margin_right, y)],
-                    fill=(180, 180, 180, 255),
-                    width=1
-                )
-                
-                # Label
-                label = f"{mult_value:.1f}x"
-                bbox = draw.textbbox((0, 0), label, font=label_font)
-                label_height = bbox[3] - bbox[1]
-                draw.text((10, y - label_height // 2), label, fill=(160, 160, 160), font=label_font)
-            
-            # Draw the FULL exponential curve from 1.0x to current_mult
-            # This is key - we draw the ENTIRE path every frame
-            line_points = []
-            
-            if current_mult > 1.0:
-                # Calculate time for current multiplier
-                time_at_current = math.log(current_mult) / math.log(1.08)
-                
-                # Generate curve points
-                num_curve_points = 100
-                for j in range(num_curve_points):
-                    # Time progress from 0 to time_at_current
-                    time_t = (j / (num_curve_points - 1)) * time_at_current
-                    
-                    # Calculate multiplier at this time point
-                    curve_mult = 1.0 * (1.08 ** time_t)
-                    
-                    # X position - spread across width
-                    x = margin_left + (time_t / time_at_current) * graph_width
-                    
-                    # Y position based on multiplier
-                    if curve_mult <= graph_max and curve_mult >= graph_min:
-                        y_progress = (curve_mult - graph_min) / (graph_max - graph_min)
-                        y = height - margin_bottom - (y_progress * graph_height)
-                        line_points.append((x, y))
-            else:
-                # Just starting at 1.0x
-                x = margin_left
-                y = height - margin_bottom
-                line_points.append((x, y))
-            
-            # Draw the curve with glow
-            if len(line_points) > 1:
-                # Glow layers
-                for glow_width in [12, 8, 4]:
-                    alpha = 30 if glow_width == 12 else 50 if glow_width == 8 else 80
-                    glow_color = line_color + (alpha,)
-                    draw.line(line_points, fill=glow_color, width=glow_width)
-                
-                # Main line
-                draw.line(line_points, fill=line_color + (255,), width=3)
-                
-                # Rocket emoji at the end
-                if line_points:
-                    rocket_x, rocket_y = line_points[-1]
-                    draw.text((rocket_x - 10, rocket_y - 25), "🚀", font=title_font)
-            
-            # Multiplier in top-left - FRESH each frame (no overlap)
-            mult_text = f"{current_mult:.2f}x"
-            draw.text((25, 20), mult_text, fill=text_color, font=title_font)
-            
-            frames.append(img)
-    
-    else:  # crashed
-        # Show crash with full curve and explosion
-        num_frames = 12
-        
-        graph_min = 1.0
-        graph_max = max(multiplier * 1.3, 3.0)
-        
-        margin_left = 80
-        margin_right = 30
-        margin_top = 90
-        margin_bottom = 50
-        
-        for i in range(num_frames):
-            # FRESH CANVAS
-            img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
-            draw = ImageDraw.Draw(img)
-            
-            graph_height = height - margin_top - margin_bottom
-            graph_width = width - margin_left - margin_right
-            
-            # Grid lines
-            num_lines = 6
-            for j in range(num_lines):
-                mult_value = graph_min + (graph_max - graph_min) * (j / (num_lines - 1))
-                y = height - margin_bottom - (j / (num_lines - 1)) * graph_height
-                
-                draw.line(
-                    [(margin_left, y), (width - margin_right, y)],
-                    fill=(180, 180, 180, 255),
-                    width=1
-                )
-                
-                label = f"{mult_value:.1f}x"
-                bbox = draw.textbbox((0, 0), label, font=label_font)
-                label_height = bbox[3] - bbox[1]
-                draw.text((10, y - label_height // 2), label, fill=(160, 160, 160), font=label_font)
-            
-            # Draw full curve up to crash point
-            line_points = []
-            
-            if multiplier > 1.0:
-                time_at_crash = math.log(multiplier) / math.log(1.08)
-                
-                num_curve_points = 100
-                for j in range(num_curve_points):
-                    time_t = (j / (num_curve_points - 1)) * time_at_crash
-                    curve_mult = 1.0 * (1.08 ** time_t)
-                    
-                    x = margin_left + (time_t / time_at_crash) * graph_width
-                    
-                    if curve_mult <= graph_max and curve_mult >= graph_min:
-                        y_progress = (curve_mult - graph_min) / (graph_max - graph_min)
-                        y = height - margin_bottom - (y_progress * graph_height)
-                        line_points.append((x, y))
-            
-            # Draw red curve
-            if len(line_points) > 1:
-                for glow_width in [12, 8, 4]:
-                    alpha = 30 if glow_width == 12 else 50 if glow_width == 8 else 80
-                    draw.line(line_points, fill=(220, 50, 50, alpha), width=glow_width)
-                
-                draw.line(line_points, fill=(220, 50, 50, 255), width=3)
-            
-            # Explosion at end
-            if line_points and i < 8:
-                crash_x, crash_y = line_points[-1]
-                explosion_radius = 15 + (i * 10)
-                explosion_alpha = max(0, 255 - (i * 32))
-                
-                for r_offset in [0, -10, 10]:
-                    r = explosion_radius + r_offset
-                    if r > 0:
-                        draw.ellipse(
-                            [crash_x - r, crash_y - r, crash_x + r, crash_y + r],
-                            fill=(255, 150, 0, max(0, explosion_alpha - abs(r_offset) * 10))
-                        )
-                
-                draw.ellipse(
-                    [crash_x - 8, crash_y - 8, crash_x + 8, crash_y + 8],
-                    fill=(255, 255, 255, explosion_alpha)
-                )
-            
-            # Crashed multiplier in top-left - FRESH each frame
-            mult_text = f"{multiplier:.2f}x"
-            draw.text((25, 20), mult_text, fill=(220, 50, 50), font=title_font)
-            
-            # "CRASHED" subtitle
-            try:
-                subtitle_font = ImageFont.truetype("C:/Windows/Fonts/Poppins-Regular.ttf", 16)
-            except:
-                subtitle_font = label_font
-            
-            draw.text((25, 70), "💥 CRASHED!", fill=(255, 100, 100), font=subtitle_font)
-            
-            frames.append(img)
-    
-    # Save as animated GIF
-    if frames:
-        duration = int(1000 / fps)  # Duration per frame in milliseconds
-        frames[0].save(
-            output_path,
-            save_all=True,
-            append_images=frames[1:],
-            duration=duration,
-            loop=0,  # Loop forever
-            optimize=False
+        # Call Node.js script to generate GIF
+        result = subprocess.run(
+            ["node", node_script, mapped_phase, str(multiplier), output_path],
+            cwd=bot_dir,
+            capture_output=True,
+            text=True,
+            timeout=30
         )
+        
+        if result.returncode != 0:
+            print(f"[GIF] Error generating GIF: {result.stderr}")
+            # Fall back to simple generation
+            return _generate_simple_gif(phase, multiplier, output_path)
+        
+        print(f"[GIF] Generated: {output_path}")
+        return output_path
+        
+    except Exception as e:
+        print(f"[GIF] Failed to generate with Node.js: {e}")
+        # Fall back to simple generation
+        return _generate_simple_gif(phase, multiplier, output_path)
+
+
+def _generate_simple_gif(phase: str, multiplier: float, output_path: str) -> str:
+    """Fallback: generate a simple static image as GIF"""
+    from PIL import Image, ImageDraw, ImageFont
+    
+    img = Image.new('RGBA', (700, 400), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    
+    try:
+        font = ImageFont.truetype("arial.ttf", 48)
+    except:
+        font = ImageFont.load_default()
+    
+    # Simple text display
+    color_map = {
+        'betting': (254, 231, 92),
+        'running': (34, 197, 94),
+        'supersonic': (255, 140, 0),
+        'crashed': (220, 50, 50)
+    }
+    
+    color = color_map.get(phase, (255, 255, 255))
+    text = f"{multiplier:.2f}x"
+    
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    
+    x = (700 - text_width) // 2
+    y = (400 - text_height) // 2
+    
+    draw.text((x, y), text, fill=color, font=font)
+    
+    # Save as single-frame GIF
+    img.save(output_path, 'GIF', duration=1000, loop=0)
     
     return output_path
 

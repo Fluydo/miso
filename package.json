@@ -1,0 +1,15 @@
+{
+  "name": "miso-bot-renderer",
+  "version": "1.0.0",
+  "description": "Node.js renderer for Miso Bot crash game GIFs",
+  "main": "generate_gif.js",
+  "scripts": {
+    "test": "node generate_gif.js running 2.5 test.gif"
+  },
+  "keywords": ["discord", "bot", "gif", "puppeteer"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "puppeteer": "^21.0.0"
+  }
+}
