@@ -232,36 +232,40 @@ class Moderation(commands.Cog):
             user_name=str(user),
             reason=reason,
         )
-        await interaction.response.defer()
         await interaction.followup.send(embed=embed)
 
-        # Visual Moderation Card
-        file = None
-        try:
-            png_bytes = await render_moderation_action(
-                action_name="Banned",
-                target_name=str(user),
-                target_avatar_url=user.display_avatar.url,
-                mod_name=interaction.user.name,
-                reason=reason,
-                badge_color="#ed4245",
-            )
-            file = discord.File(io.BytesIO(png_bytes), filename="mod_action.png")
-        except Exception:
-            pass
+        # Send log in background (don't block command response)
+        async def send_log_async():
+            # Visual Moderation Card
+            file = None
+            try:
+                png_bytes = await render_moderation_action(
+                    action_name="Banned",
+                    target_name=str(user),
+                    target_avatar_url=user.display_avatar.url,
+                    mod_name=interaction.user.name,
+                    reason=reason,
+                    badge_color="#ed4245",
+                )
+                file = discord.File(io.BytesIO(png_bytes), filename="mod_action.png")
+            except Exception:
+                pass
 
-        log_embed = mod_action_log_embed(
-            action="Member Banned",
-            moderator_id=interaction.user.id,
-            target_id=user.id,
-            target_name=str(user),
-            reason=reason,
-            channel_id=interaction.channel_id,
-            color=config.COLOR_ERROR,
-        )
-        if file:
-            log_embed.set_image(url="attachment://mod_action.png")
-        await send_mod_log(interaction.guild, log_embed, file=file, log_type="moderation")
+            log_embed = mod_action_log_embed(
+                action="Member Banned",
+                moderator_id=interaction.user.id,
+                target_id=user.id,
+                target_name=str(user),
+                reason=reason,
+                channel_id=interaction.channel_id,
+                color=config.COLOR_ERROR,
+            )
+            if file:
+                log_embed.set_image(url="attachment://mod_action.png")
+            await send_mod_log(interaction.guild, log_embed, file=file, log_type="moderation")
+        
+        # Fire and forget - don't wait for log
+        self.bot.loop.create_task(send_log_async())
 
     # ==========================================
     # /tempban
