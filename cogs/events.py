@@ -36,7 +36,13 @@ class Events(commands.Cog):
     # ==========================================
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message) -> None:
-        if not message.guild or message.author.bot:
+        if not message.guild or (message.author and message.author.bot):
+            return
+        
+        # Check if message is cached (has content/author data)
+        # Uncached messages only have id, channel_id, guild_id
+        if not message.author:
+            logger.debug(f"Skipping delete log for uncached message {message.id}")
             return
         
         # Run in background

@@ -76,14 +76,24 @@ async def create_message_delete_log_view(
     content_parts = []
     if message.content:
         content_parts.append(message.content)
+    
+    # Show what the message contained
+    has_content_items = False
     if message.embeds:
         content_parts.append(f"[{len(message.embeds)} embed(s)]")
+        has_content_items = True
     if message.attachments:
         content_parts.append(f"[{len(message.attachments)} attachment(s)]")
+        has_content_items = True
     if message.components:
         content_parts.append("[Components V2]")
+        has_content_items = True
     
-    display_content = " ".join(content_parts) if content_parts else "No text content"
+    # If no content at all, show a clearer message
+    if not content_parts:
+        display_content = "*Empty message or bot message*"
+    else:
+        display_content = " ".join(content_parts)
 
     png_bytes = await render_deleted_message(
         author_name=author_name,
@@ -98,22 +108,29 @@ async def create_message_delete_log_view(
     item = discord.MediaGalleryItem("attachment://deleted_message.png")
     gallery = MediaGallery(item)
 
-    # Build detailed header
+    # Build detailed header with embed/attachment info
     embed_info = ""
     if message.embeds:
         embed_titles = []
         for i, embed in enumerate(message.embeds[:3], 1):  # Show first 3 embeds
-            title = embed.title or embed.description[:50] if embed.description else f"Embed {i}"
-            embed_titles.append(f"  {i}. {title}")
+            # Get embed title or first 50 chars of description
+            if embed.title:
+                title = embed.title[:100]
+            elif embed.description:
+                title = embed.description[:100]
+            else:
+                title = f"Embed {i}"
+            embed_titles.append(f"  • {title}")
         embed_info = f"\n**Embeds ({len(message.embeds)}):**\n" + "\n".join(embed_titles)
         if len(message.embeds) > 3:
-            embed_info += f"\n  ... and {len(message.embeds) - 3} more"
+            embed_info += f"\n  *... and {len(message.embeds) - 3} more*"
     
     attachment_info = ""
     if message.attachments:
-        attachment_info = f"\n**Attachments:** {', '.join([att.filename for att in message.attachments[:5]])}"
+        att_names = [att.filename for att in message.attachments[:5]]
+        attachment_info = f"\n**Attachments:** {', '.join(att_names)}"
         if len(message.attachments) > 5:
-            attachment_info += f" ... and {len(message.attachments) - 5} more"
+            attachment_info += f" *... and {len(message.attachments) - 5} more*"
 
     header_text = (
         f"### {config.EMOJI_MESSAGE_DELETE_LOGS} Message Deleted\n"
