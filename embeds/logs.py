@@ -72,10 +72,23 @@ async def create_message_delete_log_view(
     clan_tag, clan_badge_url = _get_clan_info(author)
     created_str = message.created_at.strftime("Today at %I:%M %p")
 
+    # Build content description
+    content_parts = []
+    if message.content:
+        content_parts.append(message.content)
+    if message.embeds:
+        content_parts.append(f"[{len(message.embeds)} embed(s)]")
+    if message.attachments:
+        content_parts.append(f"[{len(message.attachments)} attachment(s)]")
+    if message.components:
+        content_parts.append("[Components V2]")
+    
+    display_content = " ".join(content_parts) if content_parts else "No text content"
+
     png_bytes = await render_deleted_message(
         author_name=author_name,
         avatar_url=avatar_url,
-        content=message.content or "",
+        content=display_content,
         clan_tag=clan_tag,
         clan_badge_url=clan_badge_url,
         timestamp_str=created_str,
@@ -85,10 +98,28 @@ async def create_message_delete_log_view(
     item = discord.MediaGalleryItem("attachment://deleted_message.png")
     gallery = MediaGallery(item)
 
+    # Build detailed header
+    embed_info = ""
+    if message.embeds:
+        embed_titles = []
+        for i, embed in enumerate(message.embeds[:3], 1):  # Show first 3 embeds
+            title = embed.title or embed.description[:50] if embed.description else f"Embed {i}"
+            embed_titles.append(f"  {i}. {title}")
+        embed_info = f"\n**Embeds ({len(message.embeds)}):**\n" + "\n".join(embed_titles)
+        if len(message.embeds) > 3:
+            embed_info += f"\n  ... and {len(message.embeds) - 3} more"
+    
+    attachment_info = ""
+    if message.attachments:
+        attachment_info = f"\n**Attachments:** {', '.join([att.filename for att in message.attachments[:5]])}"
+        if len(message.attachments) > 5:
+            attachment_info += f" ... and {len(message.attachments) - 5} more"
+
     header_text = (
         f"### {config.EMOJI_MESSAGE_DELETE_LOGS} Message Deleted\n"
         f"**Author:** {author.mention} (`{author.name}` | `{author.id}`)\n"
         f"**Channel:** {message.channel.mention} (`#{message.channel.name}`)"
+        f"{embed_info}{attachment_info}"
     )
 
     container = Container(
