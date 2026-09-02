@@ -64,8 +64,9 @@ def _get_channel_type_key(channel: discord.abc.GuildChannel) -> str:
 
 async def create_message_delete_log_view(
     message: discord.Message,
-) -> tuple[LayoutView, discord.File]:
-    """Generates a Discord Components V2 log container with a rendered Discord UI message card."""
+) -> tuple[LayoutView, discord.File, list[discord.Embed]]:
+    """Generates a Discord Components V2 log container with a rendered Discord UI message card.
+    Returns: (view, file, embeds_to_show)"""
     author = message.author
     avatar_url = author.display_avatar.url
     author_name = getattr(author, "display_name", author.name)
@@ -149,7 +150,11 @@ async def create_message_delete_log_view(
 
     view = LayoutView()
     view.add_item(container)
-    return view, file
+    
+    # Return original embeds to display them in the log (max 10 to avoid hitting limits)
+    embeds_to_show = message.embeds[:10] if message.embeds else []
+    
+    return view, file, embeds_to_show
 
 
 async def create_message_edit_log_view(

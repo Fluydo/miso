@@ -48,8 +48,15 @@ class Events(commands.Cog):
         # Run in background
         async def send_log():
             try:
-                view, file = await create_message_delete_log_view(message)
-                await send_mod_log(message.guild, log_type="messages", view=view, file=file)
+                view, file, original_embeds = await create_message_delete_log_view(message)
+                # Send the log with the original embeds included
+                await send_mod_log(
+                    message.guild, 
+                    log_type="messages", 
+                    view=view, 
+                    file=file,
+                    embeds=original_embeds  # Include the original embeds
+                )
             except Exception as e:
                 logger.error(f"Error generating visual delete log: {e}", exc_info=True)
         

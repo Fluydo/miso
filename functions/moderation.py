@@ -442,11 +442,12 @@ async def send_mod_log(
     file: discord.File | None = None,
     view: discord.ui.LayoutView | None = None,
     content: str | None = None,
+    embeds: list[discord.Embed] | None = None,
 ) -> None:
     """
     Sends a log entry to the configured channel.
     Supports standard Text Channels and Forum Channels (with threads).
-    Supports discord.Embed, discord.File, and Components V2 (LayoutView).
+    Supports discord.Embed, discord.File, Components V2 (LayoutView), and multiple embeds.
     """
     channel_id = get_mod_log_channel_id(guild.id)
     if not channel_id:
@@ -465,6 +466,16 @@ async def send_mod_log(
         send_kwargs["content"] = content
     if embed:
         send_kwargs["embed"] = embed
+    if embeds:
+        # If we have multiple embeds, send them along with any single embed
+        all_embeds = []
+        if embed:
+            all_embeds.append(embed)
+        all_embeds.extend(embeds)
+        send_kwargs["embeds"] = all_embeds
+        # Remove single embed key if we're using embeds
+        if "embed" in send_kwargs:
+            del send_kwargs["embed"]
     if file:
         send_kwargs["file"] = file
     if view:
@@ -478,9 +489,9 @@ async def send_mod_log(
             if thread:
                 if newly_created:
                     # embed + file were already sent as the starter post by create_thread.
-                    # Only send a follow-up if there's a view to attach.
-                    if view:
-                        await thread.send(view=view)
+                    # Only send a follow-up if there's a view or embeds to attach.
+                    if view or embeds:
+                        await thread.send(**send_kwargs)
                 else:
                     await thread.send(**send_kwargs)
         elif isinstance(channel, (discord.TextChannel, discord.Thread, discord.VoiceChannel)):
