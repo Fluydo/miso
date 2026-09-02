@@ -183,13 +183,17 @@ class Events(commands.Cog):
     ) -> None:
         # Channel Rename (Visual Discord Channel Pill)
         if before.name != after.name:
+            logger.info(f"🔔 Channel renamed: '{before.name}' → '{after.name}' - starting background render")
             # Run in background to not block other events
             async def send_log():
                 try:
+                    logger.info(f"🎨 Rendering channel update image...")
                     view, file = await create_channel_update_log_view(after, before.name, after.name)
+                    logger.info(f"✅ Render complete, sending to mod log...")
                     await send_mod_log(after.guild, log_type="server", view=view, file=file)
+                    logger.info(f"✅ Channel update log sent successfully!")
                 except Exception as e:
-                    logger.error(f"Error generating visual channel update log: {e}", exc_info=True)
+                    logger.error(f"❌ Error generating visual channel update log: {e}", exc_info=True)
             
             self.bot.loop.create_task(send_log())
 
