@@ -1019,8 +1019,9 @@ class Games(commands.Cog):
         bet: int,
         space: str,
     ) -> None:
+        await interaction.response.defer()
+        
         if bet < 10:
-            await interaction.response.defer()
             await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Minimum bet is **10** {config.EMOJI_COIN} coins.",
                 ephemeral=True,
@@ -1029,7 +1030,6 @@ class Games(commands.Cog):
 
         balance = await get_balance(interaction.user.id)
         if balance < bet:
-            await interaction.response.defer()
             await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Insufficient balance! You have **{balance}** {config.EMOJI_COIN}",
                 ephemeral=True,
@@ -1108,8 +1108,9 @@ class Games(commands.Cog):
     @app_commands.command(name="slots", description="Spin the 3-reel slot machine frame!")
     @app_commands.describe(bet="Amount of coins to bet (minimum 10)")
     async def slots(self, interaction: discord.Interaction, bet: int = 25) -> None:
+        await interaction.response.defer()
+        
         if bet < 10:
-            await interaction.response.defer()
             await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Minimum bet is **10** {config.EMOJI_COIN} coins.",
                 ephemeral=True,
@@ -1118,7 +1119,6 @@ class Games(commands.Cog):
 
         balance = await get_balance(interaction.user.id)
         if balance < bet:
-            await interaction.response.defer()
             await interaction.followup.send(
                 f"{config.EMOJI_CROSS} Insufficient balance! You have **{balance}** {config.EMOJI_COIN}",
                 ephemeral=True,
@@ -1242,9 +1242,9 @@ class Games(commands.Cog):
     # ==========================================
     @app_commands.command(name="richest", description="View the visual coin leaderboard with interactive pages.")
     async def richest(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
         leaderboard_data = await get_rich_leaderboard(limit=50)
         if not leaderboard_data:
-            await interaction.response.defer()
             await interaction.followup.send(
                 "*No economy records found yet. Run `/daily` to get started!*",
                 ephemeral=True,
@@ -1295,6 +1295,7 @@ class Games(commands.Cog):
     # ==========================================
     @app_commands.command(name="daily", description="Claim your daily coins reward and build your streak!")
     async def daily(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
         success, amount, msg = await claim_daily(interaction.user.id)
 
         if success:

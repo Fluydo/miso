@@ -195,12 +195,12 @@ class Moderation(commands.Cog):
         reason: str = "No reason provided",
         delete_message_days: app_commands.Range[int, 0, 7] = 0,
     ) -> None:
+        await interaction.response.defer()
         if not interaction.guild:
             return
 
         allowed, error_msg = can_moderate(interaction.user, user)
         if not allowed:
-            await interaction.response.defer()
             await interaction.followup.send(
                 embed=hierarchy_error_embed(error_msg), ephemeral=True
             )

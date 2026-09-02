@@ -78,6 +78,7 @@ class Utility(commands.Cog):
     @app_commands.command(name="serverrules", description="Display official server guidelines and rules.")
     @app_commands.guild_only()
     async def serverrules(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
         if not interaction.guild:
             return
 
@@ -96,7 +97,6 @@ class Utility(commands.Cog):
         if interaction.guild.icon:
             embed.set_thumbnail(url=interaction.guild.icon.url)
         embed.set_footer(text=f"{interaction.guild.name} Community Standards")
-        await interaction.response.defer()
         await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="supportticket", description="Quickly open a direct support inquiry.")
@@ -133,6 +133,7 @@ class Utility(commands.Cog):
 
     @app_commands.command(name="website", description="Visit the Miso Hub dashboard to manage giveaways, play games, and more!")
     async def website(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
         embed = discord.Embed(
             title="🌐 Miso Hub Dashboard",
             description=(
@@ -146,7 +147,6 @@ class Utility(commands.Cog):
             color=config.COLOR_PRIMARY,
         )
         embed.set_footer(text=f"{config.BOT_NAME} Web Dashboard")
-        await interaction.response.defer()
         await interaction.followup.send(embed=embed)
 
 
