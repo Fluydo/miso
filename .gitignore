@@ -14,3 +14,9 @@ data/tickets.json
 data/verification.json
 data/welcome.json
 data/antinuke.json
+
+# Node.js
+node_modules/
+package-lock.json
+*.gif
+.temp_frames/
