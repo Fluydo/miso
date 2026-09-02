@@ -39,6 +39,7 @@ class MisoBot(commands.Bot):
             command_prefix="!",
             intents=intents,
             help_command=None,
+            max_messages=10000,  # Cache up to 10k messages for delete/edit logs
         )
         
         # Start STOP signal checker
