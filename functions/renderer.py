@@ -2078,6 +2078,8 @@ def generate_crash_gif(
             cwd=bot_dir,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='ignore',  # Ignore decode errors
             timeout=30
         )
         

@@ -241,7 +241,7 @@ class Crash(commands.Cog):
     
     @tasks.loop(seconds=2)
     async def update_live_embed(self):
-        """Update live embed in crash channel every 2 seconds"""
+        """Update live message in crash channel every 2 seconds - Component v2 format"""
         if not self.crash_channel_id or not self.live_message_id:
             return
             
@@ -261,8 +261,8 @@ class Crash(commands.Cog):
             bets_result = self.supabase.table('crash_bets').select('*').eq('game_id', game['id']).execute()
             
             # Format bet list sorted by amount (highest first)
-            bet_list = []
-            for bet in sorted(bets_result.data, key=lambda x: x['amount'], reverse=True):
+            bet_lines = []
+            for bet in sorted(bets_result.data, key=lambda x: x['amount'], reverse=True)[:10]:  # Top 10 only
                 try:
                     user = await self.bot.fetch_user(int(bet['user_id']))
                     username = user.display_name
@@ -270,40 +270,25 @@ class Crash(commands.Cog):
                     username = f"User{bet['user_id'][:4]}"
                 
                 if bet['cashed_out']:
-                    status = 'cashed_out'
-                    multiplier = bet.get('cashout_multiplier', 0)
+                    mult = bet.get('cashout_multiplier', 0)
+                    bet_lines.append(f"💰 **{username}** — {bet['amount']} {COIN_EMOJI} • Cashed @ {mult}x")
                 elif game['status'] == 'ended':
-                    status = 'lost'
-                    multiplier = 0
+                    bet_lines.append(f"❌ **{username}** — {bet['amount']} {COIN_EMOJI} • Lost")
                 else:
-                    status = 'active'
-                    multiplier = 0
-                
-                bet_list.append({
-                    'username': username,
-                    'amount': bet['amount'],
-                    'status': status,
-                    'multiplier': multiplier
-                })
+                    bet_lines.append(f"🎰 **{username}** — {bet['amount']} {COIN_EMOJI} • Active")
             
             # Generate animated GIF for current phase
             temp_gif_path = os.path.join(tempfile.gettempdir(), f"crash_{game['id'][:8]}.gif")
-            temp_bets_path = os.path.join(tempfile.gettempdir(), f"crash_bets_{game['id'][:8]}.png")
             
             if game['status'] == 'betting':
                 created = datetime.fromisoformat(game['created_at'].replace('Z', '+00:00'))
                 elapsed = (datetime.now(timezone.utc) - created).total_seconds()
                 countdown = max(0, int(10 - elapsed))
                 
-                # Pass bets to GIF generator for betting phase
-                generate_crash_gif('betting', countdown=countdown, bets=bet_list, output_path=temp_gif_path)
-                
-                # Reset last multiplier when betting starts
+                generate_crash_gif('betting', countdown=countdown, output_path=temp_gif_path)
                 self.last_multiplier = 1.0
                 
-                title = "🎰 Betting Phase"
-                description = f"**Starting in {countdown} seconds**\n\nPlace your bets now!"
-                color = discord.Color.gold()
+                header = f"🎰 **BETTING PHASE**\nStarting in **{countdown} seconds** — Place your bets now!"
             elif game['status'] == 'running':
                 started = datetime.fromisoformat(game['started_at'].replace('Z', '+00:00'))
                 elapsed = (datetime.now(timezone.utc) - started).total_seconds()
@@ -312,88 +297,53 @@ class Crash(commands.Cog):
                 supersonic = current_mult >= 5.0
                 phase = 'supersonic' if supersonic else 'running'
                 
-                # Generate GIF continuing from last multiplier
-                generate_crash_gif(
-                    phase, 
-                    multiplier=current_mult,
-                    start_mult=self.last_multiplier,
-                    output_path=temp_gif_path
-                )
-                
-                # Update last multiplier
+                generate_crash_gif(phase, multiplier=current_mult, start_mult=self.last_multiplier, output_path=temp_gif_path)
                 self.last_multiplier = current_mult
                 
                 if supersonic:
-                    title = "🔥 SUPERSONIC MODE"
-                    color = discord.Color.orange()
+                    header = f"🔥 **SUPERSONIC — {current_mult}x**\n**DANGER ZONE!** Cash out before it crashes!"
                 else:
-                    title = "🚀 Flying"
-                    color = discord.Color.green()
-                    
-                description = f"# {current_mult}x\n\nCash out now!"
+                    header = f"🚀 **CRASH GAME — {current_mult}x**\nMultiplier climbing... Cash out anytime!"
             else:  # ended
                 generate_crash_gif('crashed', multiplier=game['crash_point'], output_path=temp_gif_path)
-                
-                # Reset last multiplier
                 self.last_multiplier = 1.0
                 
-                title = "💥 CRASHED!"
-                description = f"Crashed at **{game['crash_point']}x**\n\nNext round in 2s..."
-                color = discord.Color.red()
+                header = f"💥 **CRASHED**\nCrashed at **{game['crash_point']}x** — Next round in 2s..."
             
-            # Generate bet results table image
-            from functions.renderer import generate_bet_results_image
-            generate_bet_results_image(bet_list, output_path=temp_bets_path)
-                
-            embed = create_embed(title=title, description=description, color=color)
+            # Build message content (Component v2: content + GIF + buttons, NO embed)
+            bet_count = len(bets_result.data)
+            if bet_lines:
+                bets_text = "\n".join(bet_lines)
+                if bet_count > 10:
+                    bets_text += f"\n\n*...and {bet_count - 10} more*"
+            else:
+                bets_text = "*No bets yet*"
             
-            # Add website recommendation
-            embed.description += "\n\n-# We recommend you to play crash through the [website](https://miso-dashboard-iota.vercel.app/games/crash)"
-            
-            # Set the GIF as main image
-            embed.set_image(url="attachment://crash.gif")
-            
-            # Get bet count
-            bet_count = len(bet_list)
-            embed.set_footer(text=f"{bet_count} players • Live animated updates")
+            content = f"{header}\n\n**Current Bets ({bet_count})**\n{bets_text}\n\n-# Play on the [website](https://miso-dashboard-iota.vercel.app/games/crash) for a better experience"
             
             # Create view with buttons
             view = CrashButtons(self.bot, self.supabase)
             
-            # Prepare files
+            # Prepare GIF file
             gif_file = discord.File(temp_gif_path, filename="crash.gif")
-            bets_file = discord.File(temp_bets_path, filename="crash_bets.png")
             
-            # Update message with embed + both images
+            # Update message (Component v2 format: content + file + view, NO embed)
             try:
                 message = await channel.fetch_message(self.live_message_id)
-                # Edit with new files
-                await message.edit(
-                    embed=embed,
-                    attachments=[gif_file, bets_file],
-                    view=view
-                )
+                await message.edit(content=content, attachments=[gif_file], view=view)
             except discord.NotFound:
-                # Message deleted, create new one with BOTH images visible
-                # First send the embed with GIF
-                new_msg = await channel.send(
-                    embed=embed,
-                    file=gif_file,
-                    view=view
-                )
-                # Then send the bets image in a follow-up (so it appears below)
-                await channel.send(file=bets_file)
+                # Message deleted, create new one
+                new_msg = await channel.send(content=content, file=gif_file, view=view)
                 self.live_message_id = new_msg.id
             
-            # Clean up temp files
+            # Clean up temp file
             try:
                 os.remove(temp_gif_path)
-                os.remove(temp_bets_path)
             except:
                 pass
                 
         except Exception as e:
-            print(f"Live embed update error: {e}")
+            print(f"Live message update error: {e}")
             
     @update_live_embed.before_loop
     async def before_update_live_embed(self):
