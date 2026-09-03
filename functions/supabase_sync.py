@@ -1,123 +1,122 @@
 """
-functions/supabase_sync.py
-Sync bot data to Supabase for the web dashboard.
+Supabase synchronization utilities for caching Discord member data with clan tags.
+This allows the dashboard to display clan tags which aren't available via Discord REST API.
 """
 
-import logging
+import os
 from typing import Optional
-
-import httpx
-
-import config
-
-logger = logging.getLogger("miso.functions.supabase_sync")
+from supabase import create_client, Client
+import discord
 
 
-async def sync_giveaway_to_supabase(
-    message_id: int,
-    guild_id: int,
-    channel_id: int,
-    prize: str,
-    winners_count: int,
-    end_timestamp: float,
-    host_id: int,
-    active: bool = True,
-    winner_discord_id: Optional[str] = None,
-) -> bool:
-    """Sync a giveaway to Supabase so the website can read it."""
-    if not config.SUPABASE_SERVICE_KEY:
-        logger.warning("SUPABASE_SERVICE_KEY not set, skipping giveaway sync")
-        return False
+# Initialize Supabase client
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://cunbjamcjggtoayryluq.supabase.co")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")  # Service role key, not anon key
 
-    url = f"{config.SUPABASE_URL}/rest/v1/giveaways"
-    headers = {
-        "apikey": config.SUPABASE_SERVICE_KEY,
-        "Authorization": f"Bearer {config.SUPABASE_SERVICE_KEY}",
-        "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates",
-    }
+_supabase_client: Optional[Client] = None
 
-    from datetime import datetime, timezone
 
-    ends_at = datetime.fromtimestamp(end_timestamp, tz=timezone.utc).isoformat()
+def get_supabase() -> Client:
+    """Get or create Supabase client with service role key."""
+    global _supabase_client
+    if _supabase_client is None:
+        if not SUPABASE_SERVICE_KEY:
+            raise ValueError("SUPABASE_SERVICE_KEY environment variable not set")
+        _supabase_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    return _supabase_client
 
-    payload = {
-        "message_id": str(message_id),
-        "guild_id": str(guild_id),
-        "channel_id": str(channel_id),
-        "prize": prize,
-        "winners_count": winners_count,
-        "ends_at": ends_at,
-        "active": active,
-        "host": f"<@{host_id}>",
-        "winner_discord_id": winner_discord_id,
-    }
 
+async def sync_member_to_db(member: discord.Member) -> None:
+    """
+    Sync a single member's data to Supabase guild_members table.
+    Includes clan tag if available from primary_guild.
+    """
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            if resp.status_code in (200, 201):
-                logger.info(f"Synced giveaway {message_id} to Supabase")
-                return True
-            else:
-                logger.error(f"Failed to sync giveaway {message_id}: {resp.status_code} {resp.text}")
-                return False
-    except Exception as e:
-        logger.error(f"Error syncing giveaway to Supabase: {e}")
-        return False
-
-
-async def sync_giveaway_entry_to_supabase(message_id: int, user_id: int, added: bool) -> bool:
-    """Sync a giveaway entry to Supabase."""
-    if not config.SUPABASE_SERVICE_KEY:
-        return False
-
-    headers = {
-        "apikey": config.SUPABASE_SERVICE_KEY,
-        "Authorization": f"Bearer {config.SUPABASE_SERVICE_KEY}",
-        "Content-Type": "application/json",
-    }
-
-    # First get the giveaway UUID from message_id
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(
-                f"{config.SUPABASE_URL}/rest/v1/giveaways?message_id=eq.{message_id}&select=id",
-                headers=headers,
+        supabase = get_supabase()
+        
+        # Extract clan info
+        clan_tag = None
+        clan_badge_url = None
+        primary_guild = getattr(member, "primary_guild", None)
+        if primary_guild:
+            clan_tag = getattr(primary_guild, "tag", None)
+            badge = getattr(primary_guild, "badge", None)
+            if badge:
+                clan_badge_url = getattr(badge, "url", str(badge))
+        
+        # Get highest role color
+        role_color = None
+        role_icon = None
+        if member.roles:
+            sorted_roles = sorted(
+                [r for r in member.roles if r.id != member.guild.default_role.id],
+                key=lambda r: r.position,
+                reverse=True
             )
-            if resp.status_code != 200 or not resp.json():
-                logger.error(f"Giveaway {message_id} not found in Supabase")
-                return False
-
-            giveaway_id = resp.json()[0]["id"]
-
-            if added:
-                # Add entry
-                payload = {"giveaway_id": giveaway_id, "discord_id": str(user_id)}
-                resp = await client.post(
-                    f"{config.SUPABASE_URL}/rest/v1/giveaway_entries",
-                    json=payload,
-                    headers=headers,
-                )
-                if resp.status_code in (200, 201):
-                    logger.info(f"Added giveaway entry for user {user_id} to Supabase")
-                    return True
-                else:
-                    logger.error(f"Failed to add entry: {resp.status_code} {resp.text}")
-                    return False
-            else:
-                # Remove entry
-                resp = await client.delete(
-                    f"{config.SUPABASE_URL}/rest/v1/giveaway_entries?giveaway_id=eq.{giveaway_id}&discord_id=eq.{user_id}",
-                    headers=headers,
-                )
-                if resp.status_code in (200, 204):
-                    logger.info(f"Removed giveaway entry for user {user_id} from Supabase")
-                    return True
-                else:
-                    logger.error(f"Failed to remove entry: {resp.status_code} {resp.text}")
-                    return False
-
+            for role in sorted_roles:
+                if role_color is None and role.color.value != 0:
+                    role_color = role.color.value
+                if role_icon is None and role.icon:
+                    role_icon = role.icon.url
+                if role_color and role_icon:
+                    break
+        
+        # Build avatar URL
+        avatar = None
+        if member.avatar:
+            avatar = member.avatar.url
+        elif member.display_avatar:
+            avatar = member.display_avatar.url
+        
+        # Build avatar decoration URL
+        avatar_decoration = None
+        if hasattr(member, "avatar_decoration") and member.avatar_decoration:
+            avatar_decoration = member.avatar_decoration.url
+        
+        # Prepare member data
+        member_data = {
+            "guild_id": str(member.guild.id),
+            "user_id": str(member.id),
+            "username": member.name,
+            "discriminator": member.discriminator if member.discriminator != "0" else "0",
+            "avatar": avatar,
+            "avatar_decoration": avatar_decoration,
+            "nickname": member.nick,
+            "clan_tag": clan_tag,
+            "clan_badge_url": clan_badge_url,
+            "role_color": role_color,
+            "role_icon": role_icon,
+        }
+        
+        # Upsert to database (insert or update)
+        supabase.table("guild_members").upsert(
+            member_data,
+            on_conflict="guild_id,user_id"
+        ).execute()
+        
     except Exception as e:
-        logger.error(f"Error syncing giveaway entry: {e}")
-        return False
+        print(f"Error syncing member {member.id} to Supabase: {e}")
+
+
+async def sync_guild_members(guild: discord.Guild) -> int:
+    """
+    Sync all members of a guild to Supabase.
+    Returns the number of members synced.
+    """
+    count = 0
+    for member in guild.members:
+        await sync_member_to_db(member)
+        count += 1
+    return count
+
+
+async def remove_member_from_db(guild_id: int, user_id: int) -> None:
+    """Remove a member from the database when they leave."""
+    try:
+        supabase = get_supabase()
+        supabase.table("guild_members").delete().match({
+            "guild_id": str(guild_id),
+            "user_id": str(user_id)
+        }).execute()
+    except Exception as e:
+        print(f"Error removing member {user_id} from Supabase: {e}")
