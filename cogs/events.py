@@ -327,6 +327,23 @@ class Events(commands.Cog):
             embed = guild_update_log_embed(after, changes)
             await send_mod_log(after, embed, log_type="server")
 
+    # ==========================================
+    # EMOJI EVENTS -> Sync to Supabase
+    # ==========================================
+    @commands.Cog.listener()
+    async def on_guild_emojis_update(
+        self,
+        guild: discord.Guild,
+        before: list[discord.Emoji],
+        after: list[discord.Emoji],
+    ) -> None:
+        """Sync emojis to Supabase when they're added/removed/updated."""
+        logger.info(f"Emoji update detected in {guild.name}, syncing to Supabase...")
+        
+        # Trigger emoji sync
+        if hasattr(self.bot, 'sync_emojis_to_supabase'):
+            self.bot.loop.create_task(self.bot.sync_emojis_to_supabase())
+
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Events(bot))

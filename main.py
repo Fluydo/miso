@@ -45,6 +45,60 @@ class MisoBot(commands.Bot):
         
         # Start STOP signal checker
         self.stop_check_task = None
+        self.emoji_sync_task = None
+
+    async def sync_emojis_to_supabase(self) -> None:
+        """Sync all bot emojis and server emojis to Supabase."""
+        if not config.SUPABASE_SERVICE_KEY or not config.SUPABASE_URL:
+            logger.warning("Supabase not configured, skipping emoji sync")
+            return
+
+        try:
+            from supabase import create_client
+            supabase = create_client(config.SUPABASE_URL, config.SUPABASE_SERVICE_KEY)
+
+            # 1. Sync all bot emojis (from all servers)
+            bot_emojis_data = []
+            for emoji in self.emojis:
+                bot_emojis_data.append({
+                    'emoji_id': str(emoji.id),
+                    'emoji_name': emoji.name,
+                    'emoji_animated': emoji.animated,
+                    'emoji_url': str(emoji.url),
+                    'source_guild_id': str(emoji.guild_id),
+                    'updated_at': 'NOW()'
+                })
+
+            if bot_emojis_data:
+                # Clear existing bot emojis and insert new ones
+                supabase.table('bot_emojis').delete().neq('emoji_id', '').execute()
+                supabase.table('bot_emojis').upsert(bot_emojis_data).execute()
+                logger.info(f"✅ Synced {len(bot_emojis_data)} bot emojis to Supabase")
+
+            # 2. Sync server-specific emojis for each guild
+            total_server_emojis = 0
+            for guild in self.guilds:
+                server_emojis_data = []
+                for emoji in guild.emojis:
+                    server_emojis_data.append({
+                        'guild_id': str(guild.id),
+                        'emoji_id': str(emoji.id),
+                        'emoji_name': emoji.name,
+                        'emoji_animated': emoji.animated,
+                        'emoji_url': str(emoji.url),
+                        'updated_at': 'NOW()'
+                    })
+
+                if server_emojis_data:
+                    # Delete old emojis for this guild, then insert new ones
+                    supabase.table('server_emojis').delete().eq('guild_id', str(guild.id)).execute()
+                    supabase.table('server_emojis').upsert(server_emojis_data).execute()
+                    total_server_emojis += len(server_emojis_data)
+
+            logger.info(f"✅ Synced {total_server_emojis} server emojis across {len(self.guilds)} guilds")
+
+        except Exception as e:
+            logger.error(f"Failed to sync emojis to Supabase: {e}", exc_info=True)
 
     async def setup_hook(self) -> None:
         """Asynchronously load all cogs and sync slash commands."""
@@ -154,6 +208,19 @@ class MisoBot(commands.Bot):
         logger.info("🛑 STOP signal monitoring ENABLED")
         logger.info("   Bot will shutdown if STOP_SIGNAL.txt is detected")
         logger.info(divider)
+
+        # Sync emojis to Supabase on startup
+        await self.sync_emojis_to_supabase()
+
+        # Start emoji sync task (every hour)
+        if not self.emoji_sync_task or self.emoji_sync_task.done():
+            @tasks.loop(hours=1)
+            async def emoji_syncer():
+                await self.sync_emojis_to_supabase()
+            
+            self.emoji_sync_task = emoji_syncer
+            self.emoji_sync_task.start()
+            logger.info("Started emoji sync task (syncs every hour)")
 
         # Start STOP signal checker (every 10 seconds)
         if not self.stop_check_task or self.stop_check_task.done():
