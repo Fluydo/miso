@@ -19,7 +19,6 @@ from functions.giveaways import (
     load_giveaways,
     reroll_giveaway,
 )
-from functions.supabase_sync import sync_giveaway_to_supabase, sync_giveaway_entry_to_supabase
 from functions.time_parser import format_duration, parse_duration
 
 WEBSITE_URL = "https://miso-dashboard-iota.vercel.app"
@@ -40,8 +39,8 @@ class GiveawayJoinButton(discord.ui.Button):
         is_added, count = add_entry(self.target_message_id, interaction.user.id)
         self.label = f"Enter ({count})"
 
-        # Sync to Supabase
-        asyncio.create_task(sync_giveaway_entry_to_supabase(self.target_message_id, interaction.user.id, is_added))
+        # Sync to Supabase - TODO: Re-implement if needed
+        # asyncio.create_task(sync_giveaway_entry_to_supabase(self.target_message_id, interaction.user.id, is_added))
 
         if is_added:
             await interaction.followup.send("🎉 You have entered the giveaway! Good luck!", ephemeral=True)
@@ -114,20 +113,8 @@ class Giveaways(commands.Cog):
                 else:
                     desc = "No valid entries were submitted for this giveaway."
 
-                # Sync ended status to Supabase
-                asyncio.create_task(
-                    sync_giveaway_to_supabase(
-                        message_id=mid,
-                        guild_id=record["guild_id"],
-                        channel_id=record["channel_id"],
-                        prize=record["prize"],
-                        winners_count=record["winners_count"],
-                        end_timestamp=record["end_timestamp"],
-                        host_id=record["host_id"],
-                        active=False,
-                        winner_discord_id=str(winners[0]) if winners else None,
-                    )
-                )
+                # Sync ended status to Supabase - TODO: Re-implement if needed
+                # asyncio.create_task(...)
 
                 end_embed = discord.Embed(
                     title="🎁 GIVEAWAY ENDED 🎁",
@@ -215,19 +202,8 @@ class Giveaways(commands.Cog):
             host_id=interaction.user.id,
         )
 
-        # Sync to Supabase
-        asyncio.create_task(
-            sync_giveaway_to_supabase(
-                message_id=msg.id,
-                guild_id=interaction.guild.id,
-                channel_id=interaction.channel_id,
-                prize=prize,
-                winners_count=winners,
-                end_timestamp=end_ts,
-                host_id=interaction.user.id,
-                active=True,
-            )
-        )
+        # Sync to Supabase - TODO: Re-implement if needed
+        # asyncio.create_task(sync_giveaway_to_supabase(...))
 
         view = GiveawayView(message_id=msg.id, count=0)
         await msg.edit(view=view)
