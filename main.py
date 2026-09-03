@@ -66,7 +66,6 @@ class MisoBot(commands.Bot):
                     'emoji_animated': emoji.animated,
                     'emoji_url': str(emoji.url),
                     'source_guild_id': str(emoji.guild_id),
-                    'updated_at': 'NOW()'
                 })
 
             if bot_emojis_data:
@@ -74,6 +73,8 @@ class MisoBot(commands.Bot):
                 supabase.table('bot_emojis').delete().neq('emoji_id', '').execute()
                 supabase.table('bot_emojis').upsert(bot_emojis_data).execute()
                 logger.info(f"✅ Synced {len(bot_emojis_data)} bot emojis to Supabase")
+            else:
+                logger.warning("⚠️ No bot emojis found to sync")
 
             # 2. Sync server-specific emojis for each guild
             total_server_emojis = 0
@@ -86,7 +87,6 @@ class MisoBot(commands.Bot):
                         'emoji_name': emoji.name,
                         'emoji_animated': emoji.animated,
                         'emoji_url': str(emoji.url),
-                        'updated_at': 'NOW()'
                     })
 
                 if server_emojis_data:
