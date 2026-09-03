@@ -149,6 +149,41 @@ class Utility(commands.Cog):
         embed.set_footer(text=f"{config.BOT_NAME} Web Dashboard")
         await interaction.followup.send(embed=embed)
 
+    @app_commands.command(name="sync-emojis", description="Manually sync all emojis to the dashboard database.")
+    @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.guild_only()
+    async def sync_emojis(self, interaction: discord.Interaction) -> None:
+        """Manually trigger emoji sync to Supabase for dashboard."""
+        await interaction.response.defer(ephemeral=True)
+        
+        try:
+            if hasattr(self.bot, 'sync_emojis_to_supabase'):
+                await self.bot.sync_emojis_to_supabase()
+                embed = discord.Embed(
+                    title=f"{config.EMOJI_TICK} Emoji Sync Complete",
+                    description=(
+                        "Successfully synced all emojis to the dashboard database.\n\n"
+                        f"{config.EMOJI_CHEVRON_RIGHT} Bot emojis synced\n"
+                        f"{config.EMOJI_CHEVRON_RIGHT} Server emojis synced\n\n"
+                        "Emojis should now appear in the dashboard embed builder."
+                    ),
+                    color=config.COLOR_SUCCESS,
+                )
+            else:
+                embed = discord.Embed(
+                    title=f"{config.EMOJI_CROSS} Sync Failed",
+                    description="Emoji sync function not available. Please restart the bot.",
+                    color=config.COLOR_ERROR,
+                )
+        except Exception as e:
+            embed = discord.Embed(
+                title=f"{config.EMOJI_CROSS} Sync Failed",
+                description=f"Error syncing emojis: {str(e)}",
+                color=config.COLOR_ERROR,
+            )
+        
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Utility(bot))
