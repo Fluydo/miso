@@ -71,12 +71,30 @@ class MemberSync(commands.Cog):
         # Clan tag from primary_guild (if available via Gateway)
         clan_tag = None
         clan_badge_url = None
-        if hasattr(member, '_user'):
+        
+        # Try multiple approaches to get clan data
+        # Method 1: Check if user has clan attribute
+        if hasattr(member, 'clan') and member.clan:
+            clan_tag = getattr(member.clan, 'tag', None)
+            badge = getattr(member.clan, 'badge', None)
+            if badge:
+                identity_guild_id = getattr(member.clan, 'identity_guild_id', None) or getattr(member.clan, 'guild_id', None)
+                if identity_guild_id:
+                    clan_badge_url = f"https://cdn.discordapp.com/clan-badges/{identity_guild_id}/{badge}.png"
+        
+        # Method 2: Check _user.clan
+        elif hasattr(member, '_user'):
             user = member._user
             if hasattr(user, 'clan') and user.clan:
-                clan_tag = user.clan.tag
-                if user.clan.badge:
-                    clan_badge_url = f"https://cdn.discordapp.com/clan-badges/{user.clan.identity_guild_id}/{user.clan.badge}.png"
+                clan_tag = getattr(user.clan, 'tag', None)
+                badge = getattr(user.clan, 'badge', None)
+                if badge:
+                    identity_guild_id = getattr(user.clan, 'identity_guild_id', None) or getattr(user.clan, 'guild_id', None)
+                    if identity_guild_id:
+                        clan_badge_url = f"https://cdn.discordapp.com/clan-badges/{identity_guild_id}/{badge}.png"
+        
+        # Log for debugging (only if syncing manually)
+        logger.debug(f"Member {member.name}: clan_tag={clan_tag}, has_clan_attr={hasattr(member, 'clan')}, has_user={hasattr(member, '_user')}")
 
         return {
             "guild_id": str(member.guild.id),
