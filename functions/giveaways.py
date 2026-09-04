@@ -54,8 +54,18 @@ def create_giveaway(
     winners_count: int,
     end_timestamp: float,
     host_id: int,
+    min_invites: Optional[int] = None,
+    required_roles: Optional[list[int]] = None,
 ) -> None:
     data = load_giveaways()
+    
+    # Build requirements dict
+    requirements = {}
+    if min_invites is not None and min_invites > 0:
+        requirements["min_invites"] = min_invites
+    if required_roles:
+        requirements["required_roles"] = [str(r) for r in required_roles]
+    
     data[str(message_id)] = {
         "guild_id": guild_id,
         "channel_id": channel_id,
@@ -67,6 +77,12 @@ def create_giveaway(
         "entries": [],
         "ended": False,
         "winners": [],
+        "requirements": requirements,
+        "winner_id": None,
+        "redeemed": False,
+        "redemption_expires": None,
+        "ticket_id": None,
+        "dm_sent": False,
     }
     save_giveaways(data)
 
@@ -99,9 +115,19 @@ def end_giveaway(message_id: int) -> Optional[dict]:
     record["ended"] = True
     entries = record.get("entries", [])
     winners_count = record.get("winners_count", 1)
+    requirements = record.get("requirements", {})
 
-    if entries:
-        chosen = random.sample(entries, min(len(entries), winners_count))
+    # Filter entries by requirements if any exist
+    valid_entries = entries
+    if requirements:
+        # We'll mark invalid entries for filtering
+        # Note: This is a simple check - the actual validation happened on entry
+        # But users might have lost invites/roles after entering
+        valid_entries = entries  # For now, trust the entry validation
+        # TODO: Add re-validation logic if needed
+
+    if valid_entries:
+        chosen = random.sample(valid_entries, min(len(valid_entries), winners_count))
     else:
         chosen = []
 
@@ -125,3 +151,38 @@ def reroll_giveaway(message_id: int) -> tuple[Optional[int], str]:
     record["winners"] = [new_winner]
     save_giveaways(data)
     return new_winner, record.get("prize", "Prize")
+
+
+def reroll_giveaway_redemption(message_id: int) -> tuple[Optional[int], str, int]:
+    """
+    Reroll a giveaway with redemption system.
+    Returns (new_winner_id, prize, expiry_timestamp) or (None, error_msg, 0)
+    """
+    data = load_giveaways()
+    mid = str(message_id)
+    if mid not in data:
+        return None, "Giveaway not found.", 0
+
+    record = data[mid]
+    entries = record.get("entries", [])
+    
+    # Remove current winner from pool if they didn't redeem
+    current_winner = record.get("winner_id")
+    available_entries = [e for e in entries if e != current_winner] if current_winner else entries
+    
+    if not available_entries:
+        return None, "No more entries available for reroll.", 0
+
+    new_winner = random.choice(available_entries)
+    expires_ts = int(time.time() + 86400)  # 24 hours from now
+    
+    record["winners"] = [new_winner]
+    record["winner_id"] = new_winner
+    record["redeemed"] = False
+    record["redeemed_at"] = None
+    record["redemption_expires"] = expires_ts
+    record["ticket_id"] = None
+    record["dm_sent"] = False
+    
+    save_giveaways(data)
+    return new_winner, record.get("prize", "Prize"), expires_ts

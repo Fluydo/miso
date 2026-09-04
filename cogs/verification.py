@@ -17,6 +17,10 @@ from functions.renderer import render_verify_log
 from functions.verification import (
     add_exception_channel,
     remove_exception_channel,
+    add_blacklisted_channel,
+    remove_blacklisted_channel,
+    add_blacklisted_category,
+    remove_blacklisted_category,
     get_verification_settings,
     set_verification_setup,
 )
@@ -139,6 +143,8 @@ class Verification(commands.Cog):
         set_verification_setup(interaction.guild.id, channel.id, verified_role.id)
         settings = get_verification_settings(interaction.guild.id)
         exceptions = set(settings.get("exception_channel_ids", []))
+        blacklisted_channels = set(settings.get("blacklisted_channel_ids", []))
+        blacklisted_categories = set(settings.get("blacklisted_category_ids", []))
 
         # Send quick confirmation first
         await interaction.followup.send(
@@ -153,6 +159,12 @@ class Verification(commands.Cog):
 
         for ch in interaction.guild.channels:
             try:
+                # Check if channel or its category is blacklisted
+                is_blacklisted = ch.id in blacklisted_channels
+                if isinstance(ch, (discord.TextChannel, discord.VoiceChannel, discord.ForumChannel)):
+                    if ch.category_id and ch.category_id in blacklisted_categories:
+                        is_blacklisted = True
+                
                 if ch.id == channel.id:
                     # On verification channel: @everyone can view (no chat), verified_role cannot view
                     await ch.set_permissions(
@@ -166,6 +178,18 @@ class Verification(commands.Cog):
                         verified_role,
                         view_channel=False,
                         reason="Verification Setup",
+                    )
+                elif is_blacklisted:
+                    # Blacklisted channel/category: @everyone can view, verified_role CANNOT view
+                    await ch.set_permissions(
+                        everyone_role,
+                        view_channel=True,
+                        reason="Verification Blacklist",
+                    )
+                    await ch.set_permissions(
+                        verified_role,
+                        view_channel=False,
+                        reason="Verification Blacklist - Staff Only",
                     )
                 elif ch.id in exceptions:
                     # Exception channel: @everyone can view read-only, verified_role normal view
@@ -334,6 +358,155 @@ class Verification(commands.Cog):
         await interaction.response.defer()
         await interaction.followup.send(
             f"{config.EMOJI_TICK} {channel.mention} is no longer an exception channel — unverified users will no longer see it.",
+            ephemeral=True,
+        )
+
+    blacklist_group = app_commands.Group(
+        name="blacklist",
+        description="Manage blacklisted channels/categories that verified users CANNOT see (staff-only).",
+        parent=verify_group,
+        guild_only=True,
+    )
+
+    @blacklist_group.command(name="add-channel", description="Blacklist a channel so verified users cannot see it (staff only).")
+    @app_commands.describe(channel="The channel to blacklist from verified users")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def verify_blacklist_add_channel(self, interaction: discord.Interaction, channel: discord.TextChannel) -> None:
+        if not interaction.guild:
+            return
+
+        added = add_blacklisted_channel(interaction.guild.id, channel.id)
+        if not added:
+            await interaction.response.defer()
+            await interaction.followup.send(
+                f"{config.EMOJI_INFO} {channel.mention} is already blacklisted.",
+                ephemeral=True,
+            )
+            return
+
+        settings = get_verification_settings(interaction.guild.id)
+        verified_role_id = settings.get("verified_role_id")
+        verified_role = interaction.guild.get_role(verified_role_id) if verified_role_id else None
+
+        everyone_role = interaction.guild.default_role
+        try:
+            # @everyone can view (unverified users)
+            await channel.set_permissions(
+                everyone_role,
+                view_channel=True,
+                reason="Verification Blacklist - Staff Only",
+            )
+            # Verified role CANNOT view
+            if verified_role:
+                await channel.set_permissions(
+                    verified_role,
+                    view_channel=False,
+                    reason="Verification Blacklist - Hide from verified users",
+                )
+        except discord.Forbidden:
+            await interaction.response.defer()
+            await interaction.followup.send(
+                f"{config.EMOJI_CROSS} Missing permissions to edit channel overwrites.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer()
+        await interaction.followup.send(
+            f"{config.EMOJI_TICK} {channel.mention} is now blacklisted — verified users cannot see it (staff only).",
+            ephemeral=True,
+        )
+
+    @blacklist_group.command(name="remove-channel", description="Remove a channel from blacklist, allowing verified users to see it.")
+    @app_commands.describe(channel="The channel to unblacklist")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def verify_blacklist_remove_channel(self, interaction: discord.Interaction, channel: discord.TextChannel) -> None:
+        if not interaction.guild:
+            return
+
+        removed = remove_blacklisted_channel(interaction.guild.id, channel.id)
+        if not removed:
+            await interaction.response.defer()
+            await interaction.followup.send(
+                f"{config.EMOJI_INFO} {channel.mention} is not blacklisted.",
+                ephemeral=True,
+            )
+            return
+
+        settings = get_verification_settings(interaction.guild.id)
+        verified_role_id = settings.get("verified_role_id")
+        verified_role = interaction.guild.get_role(verified_role_id) if verified_role_id else None
+
+        everyone_role = interaction.guild.default_role
+        try:
+            # Standard verification: @everyone cannot view
+            await channel.set_permissions(
+                everyone_role,
+                view_channel=False,
+                reason="Blacklist Removed - Standard Verification",
+            )
+            # Verified role can view
+            if verified_role:
+                await channel.set_permissions(
+                    verified_role,
+                    view_channel=True,
+                    reason="Blacklist Removed - Verified access restored",
+                )
+        except discord.Forbidden:
+            await interaction.response.defer()
+            await interaction.followup.send(
+                f"{config.EMOJI_CROSS} Removed from blacklist, but missing permissions to update channel overwrites.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer()
+        await interaction.followup.send(
+            f"{config.EMOJI_TICK} {channel.mention} removed from blacklist — verified users can now see it.",
+            ephemeral=True,
+        )
+
+    @blacklist_group.command(name="add-category", description="Blacklist an entire category so verified users cannot see any channels in it.")
+    @app_commands.describe(category="The category to blacklist from verified users")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def verify_blacklist_add_category(self, interaction: discord.Interaction, category: discord.CategoryChannel) -> None:
+        if not interaction.guild:
+            return
+
+        added = add_blacklisted_category(interaction.guild.id, category.id)
+        if not added:
+            await interaction.response.defer()
+            await interaction.followup.send(
+                f"{config.EMOJI_INFO} **{category.name}** is already blacklisted.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer()
+        await interaction.followup.send(
+            f"{config.EMOJI_INFO} **{category.name}** marked as blacklisted. Run `/verify setup` again to apply permissions to all channels in this category.",
+            ephemeral=True,
+        )
+
+    @blacklist_group.command(name="remove-category", description="Remove a category from blacklist.")
+    @app_commands.describe(category="The category to unblacklist")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def verify_blacklist_remove_category(self, interaction: discord.Interaction, category: discord.CategoryChannel) -> None:
+        if not interaction.guild:
+            return
+
+        removed = remove_blacklisted_category(interaction.guild.id, category.id)
+        if not removed:
+            await interaction.response.defer()
+            await interaction.followup.send(
+                f"{config.EMOJI_INFO} **{category.name}** is not blacklisted.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer()
+        await interaction.followup.send(
+            f"{config.EMOJI_TICK} **{category.name}** removed from blacklist. Run `/verify setup` again to restore verified user access to channels in this category.",
             ephemeral=True,
         )
 
