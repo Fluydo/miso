@@ -116,6 +116,40 @@ class MisoBot(commands.Bot):
                 logger.error(f"Failed to load extension {cog_name}: {e}", exc_info=True)
 
         self.tree.on_error = self.on_app_command_error
+        
+        # Register persistent views for buttons
+        self.add_persistent_views()
+    
+    def add_persistent_views(self) -> None:
+        """Register all persistent views for button interactions."""
+        from functions.giveaways import load_giveaways
+        from cogs.giveaways import GiveawayView, GiveawayRedemptionView
+        
+        # Load all active giveaways and register their views
+        data = load_giveaways()
+        view_count = 0
+        
+        for msg_id_str, giveaway in data.items():
+            msg_id = int(msg_id_str)
+            
+            if not giveaway.get("ended"):
+                # Active giveaway - register join view
+                entry_count = len(giveaway.get("entries", []))
+                view = GiveawayView(message_id=msg_id, count=entry_count)
+                self.add_view(view)
+                view_count += 1
+            elif giveaway.get("ended") and not giveaway.get("redeemed"):
+                # Ended but not redeemed - register redemption view
+                winner_id = giveaway.get("winner_id")
+                expires_ts = giveaway.get("redemption_expires")
+                
+                if winner_id and expires_ts:
+                    view = GiveawayRedemptionView(msg_id, winner_id, expires_ts)
+                    self.add_view(view)
+                    view_count += 1
+        
+        if view_count > 0:
+            logger.info(f"Registered {view_count} persistent giveaway views")
 
     async def _force_sync(self) -> dict:
         """Force-clear and re-sync commands to all dev guilds + globally. Returns counts."""
