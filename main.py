@@ -210,6 +210,19 @@ class MisoBot(commands.Bot):
         else:
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
+    async def on_guild_join(self, guild: discord.Guild) -> None:
+        """Executed when the bot joins a new guild."""
+        logger.info(f"Joined new guild: {guild.name} ({guild.id}) with {guild.member_count} members")
+        
+        # Apply bot profile for this guild if one exists
+        try:
+            from functions.bot_profile import apply_guild_profile
+            applied = await apply_guild_profile(self, guild)
+            if applied:
+                logger.info(f"Applied custom bot profile for guild {guild.name} ({guild.id})")
+        except Exception as e:
+            logger.error(f"Failed to apply bot profile for new guild {guild.id}: {e}", exc_info=True)
+
     async def check_stop_signal(self):
         """Check for STOP_SIGNAL.txt and shutdown if found."""
         stop_signal_path = config.BASE_DIR / "STOP_SIGNAL.txt"
@@ -245,6 +258,15 @@ class MisoBot(commands.Bot):
 
         # Sync emojis to Supabase on startup
         await self.sync_emojis_to_supabase()
+
+        # Sync bot profiles for all guilds
+        try:
+            from functions.bot_profile import sync_all_guild_profiles
+            logger.info("Syncing bot profiles for all guilds...")
+            profile_results = await sync_all_guild_profiles(self)
+            logger.info(f"Bot profiles synced: {profile_results['success']} applied, {profile_results['skipped']} skipped, {profile_results['failed']} failed")
+        except Exception as e:
+            logger.error(f"Failed to sync bot profiles: {e}", exc_info=True)
 
         # Start emoji sync task (every hour)
         if not self.emoji_sync_task or self.emoji_sync_task.done():

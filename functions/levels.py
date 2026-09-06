@@ -92,18 +92,22 @@ def xp_for_level(level: int) -> int:
     """
     Returns the total XP required to complete a given level.
     
-    Formula:
-    - Levels 1-10: 35 * (level^2) + 15 * level  (3x easier than before)
-    - Levels 11+: 65 * (level^2) + 35 * level   (1.5x easier than before)
+    Formula (3x easier than original):
+    - Levels 1-10: 35 * (level^2) + 15 * level  (very easy early game)
+    - Levels 11+: 65 * (level^2) + 35 * level   (easier late game)
+    
+    Original formula was:
+    - Levels 1-10: 105 * (level^2) + 45 * level
+    - Levels 11+: 195 * (level^2) + 105 * level
     
     This makes early leveling much easier to get players hooked,
     while still maintaining progression at higher levels.
     """
     if level <= 10:
-        # Early game - very easy (3x easier)
+        # Early game - very easy (3x easier: 105/3=35, 45/3=15)
         return 35 * (level ** 2) + 15 * level
     else:
-        # Late game - easier but not too easy (1.5x easier)
+        # Late game - easier (3x easier: 195/3=65, 105/3=35)
         return 65 * (level ** 2) + 35 * level
 
 
