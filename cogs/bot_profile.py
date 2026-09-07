@@ -26,8 +26,6 @@ class BotProfileCog(commands.Cog):
     @app_commands.command(name="randomize", description="Randomize the bot's profile in this server (Admin only)")
     @app_commands.checks.has_permissions(administrator=True)
     async def randomize_profile(self, interaction: discord.Interaction) -> None:
-    @app_commands.checks.has_permissions(administrator=True)
-    async def randomize_profile(self, interaction: discord.Interaction) -> None:
         """Randomize bot profile with random name, pfp, and banner."""
         try:
             if not interaction.guild:

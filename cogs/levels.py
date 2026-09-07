@@ -366,14 +366,6 @@ class Levels(commands.Cog):
         )
         await _send_rank_card(interaction, user, new_level, new_xp, next_req)
 
-
-async def setup(bot: commands.Bot) -> None:
-    cog = Levels(bot)
-    await bot.add_cog(cog)
-    # Register command groups
-    bot.tree.add_command(cog.levelup_group)
-
-
     # Level-up settings commands
     levelup_group = app_commands.Group(name="levelup", description="Configure level-up message settings")
 
@@ -482,3 +474,10 @@ async def setup(bot: commands.Bot) -> None:
             await interaction.followup.send(f"✅ Level-up DMs have been **{status}**!", ephemeral=True)
         else:
             await interaction.followup.send("❌ Failed to update settings.", ephemeral=True)
+
+
+async def setup(bot: commands.Bot) -> None:
+    cog = Levels(bot)
+    await bot.add_cog(cog)
+    # Register level-up command group
+    bot.tree.add_command(cog.levelup_group)
