@@ -1,178 +1,270 @@
 """
 functions/economy.py
-Pure data-access layer for the Miso Economy & Minigames System.
-Persists data to data/economy.json.
+Server economy system with coins, transactions, and shop.
 """
 
-import json
 import logging
-from datetime import datetime, timezone, timedelta
-
+from typing import Optional
 import config
 
-logger = logging.getLogger("miso.economy")
-
-DEFAULT_STARTING_BALANCE: int = 250
-DAILY_REWARD_AMOUNT: int = 150
+logger = logging.getLogger("miso.functions.economy")
 
 
-def _ensure_economy_file() -> None:
-    config.DATA_DIR.mkdir(parents=True, exist_ok=True)
-    if not config.ECONOMY_FILE.exists():
-        with open(config.ECONOMY_FILE, "w", encoding="utf-8") as f:
-            json.dump({}, f)
-
-
-def load_economy() -> dict[str, dict]:
-    """Loads all economy user records from disk."""
-    _ensure_economy_file()
-    try:
-        with open(config.ECONOMY_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data if isinstance(data, dict) else {}
-    except (json.JSONDecodeError, OSError) as e:
-        logger.error(f"Error loading economy file: {e}. Resetting.")
-        return {}
-
-
-def save_economy(data: dict[str, dict]) -> None:
-    """Saves economy user records to disk."""
-    _ensure_economy_file()
-    try:
-        with open(config.ECONOMY_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-    except OSError as e:
-        logger.error(f"Error saving economy file: {e}")
-
-
-def _get_user_record(data: dict[str, dict], user_id: int) -> dict:
-    """Gets or initializes a user's economy record."""
-    key = str(user_id)
-    if key not in data:
-        data[key] = {
-            "wallet": DEFAULT_STARTING_BALANCE,
-            "bank": 0,
-            "last_daily": None,
-            "streak": 0,
-            "games_played": 0,
-            "games_won": 0,
-            "total_profit": 0,
+async def get_economy_settings(guild_id: int) -> dict:
+    """Get economy settings for a guild."""
+    if not config.SUPABASE_SERVICE_KEY or not config.SUPABASE_URL:
+        return {
+            'enabled': True,
+            'currency_name': 'coins',
+            'currency_symbol': '🪙',
+            'daily_reward': 100,
+            'message_reward_min': 5,
+            'message_reward_max': 15,
+            'voice_reward_per_minute': 3
         }
-    return data[key]
+    
+    try:
+        from supabase import create_client
+        supabase = create_client(config.SUPABASE_URL, config.SUPABASE_SERVICE_KEY)
+        
+        response = supabase.table('economy_settings').select('*').eq('guild_id', str(guild_id)).execute()
+        
+        if response.data and len(response.data) > 0:
+            return response.data[0]
+        return {
+            'enabled': True,
+            'currency_name': 'coins',
+            'currency_symbol': '🪙',
+            'daily_reward': 100,
+            'message_reward_min': 5,
+            'message_reward_max': 15,
+            'voice_reward_per_minute': 3
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch economy settings: {e}")
+        return {'enabled': True, 'currency_name': 'coins', 'currency_symbol': '🪙'}
 
 
-def get_balance(user_id: int) -> int:
-    """Retrieves a user's wallet balance."""
-    data = load_economy()
-    return _get_user_record(data, user_id).get("wallet", DEFAULT_STARTING_BALANCE)
+async def get_balance(guild_id: int, user_id: int) -> dict:
+    """
+    Get user's balance.
+    
+    Returns:
+        dict with keys: coins, bank, total_earned, total_spent
+    """
+    if not config.SUPABASE_SERVICE_KEY or not config.SUPABASE_URL:
+        return {'coins': 0, 'bank': 0, 'total_earned': 0, 'total_spent': 0}
+    
+    try:
+        from supabase import create_client
+        supabase = create_client(config.SUPABASE_URL, config.SUPABASE_SERVICE_KEY)
+        
+        response = supabase.table('user_economy').select('*').eq('guild_id', str(guild_id)).eq('user_id', str(user_id)).execute()
+        
+        if response.data and len(response.data) > 0:
+            return response.data[0]
+        return {'coins': 0, 'bank': 0, 'total_earned': 0, 'total_spent': 0}
+    except Exception as e:
+        logger.error(f"Failed to get balance: {e}")
+        return {'coins': 0, 'bank': 0, 'total_earned': 0, 'total_spent': 0}
 
 
-def add_balance(user_id: int, amount: int) -> int:
-    """Adds coins to a user's wallet and returns the new balance."""
-    if amount <= 0:
-        return get_balance(user_id)
-    data = load_economy()
-    record = _get_user_record(data, user_id)
-    record["wallet"] = record.get("wallet", 0) + amount
-    save_economy(data)
-    return record["wallet"]
-
-
-def remove_balance(user_id: int, amount: int) -> bool:
-    """Safely removes coins from a user's wallet. Returns True on success, False if insufficient."""
-    if amount <= 0:
-        return True
-    data = load_economy()
-    record = _get_user_record(data, user_id)
-    current = record.get("wallet", 0)
-    if current < amount:
+async def add_coins(guild_id: int, user_id: int, amount: int, reason: str = 'earned') -> bool:
+    """
+    Add coins to user's wallet.
+    
+    Args:
+        guild_id: Guild ID
+        user_id: User ID
+        amount: Amount to add (can be negative)
+        reason: Transaction reason
+    
+    Returns:
+        True if successful
+    """
+    if not config.SUPABASE_SERVICE_KEY or not config.SUPABASE_URL:
         return False
-    record["wallet"] = current - amount
-    save_economy(data)
-    return True
+    
+    try:
+        from supabase import create_client
+        supabase = create_client(config.SUPABASE_URL, config.SUPABASE_SERVICE_KEY)
+        
+        # Get current balance
+        response = supabase.table('user_economy').select('*').eq('guild_id', str(guild_id)).eq('user_id', str(user_id)).execute()
+        
+        if response.data and len(response.data) > 0:
+            current = response.data[0]
+            new_coins = current['coins'] + amount
+            new_earned = current['total_earned'] + max(0, amount)
+            new_spent = current['total_spent'] + max(0, -amount)
+            
+            supabase.table('user_economy').update({
+                'coins': max(0, new_coins),
+                'total_earned': new_earned,
+                'total_spent': new_spent
+            }).eq('guild_id', str(guild_id)).eq('user_id', str(user_id)).execute()
+        else:
+            # Create new entry
+            supabase.table('user_economy').insert({
+                'guild_id': str(guild_id),
+                'user_id': str(user_id),
+                'coins': max(0, amount),
+                'bank': 0,
+                'total_earned': max(0, amount),
+                'total_spent': 0
+            }).execute()
+        
+        # Log transaction
+        supabase.table('economy_transactions').insert({
+            'guild_id': str(guild_id),
+            'user_id': str(user_id),
+            'amount': amount,
+            'transaction_type': 'earn' if amount > 0 else 'spend',
+            'description': reason
+        }).execute()
+        
+        return True
+    except Exception as e:
+        logger.error(f"Failed to add coins: {e}", exc_info=True)
+        return False
 
 
-def record_game_result(user_id: int, won: bool, profit_or_loss: int) -> None:
-    """Records statistics for minigame wins, losses, and net profits."""
-    data = load_economy()
-    record = _get_user_record(data, user_id)
-    record["games_played"] = record.get("games_played", 0) + 1
-    if won:
-        record["games_won"] = record.get("games_won", 0) + 1
-    record["total_profit"] = record.get("total_profit", 0) + profit_or_loss
-    save_economy(data)
-
-
-def claim_daily(user_id: int) -> tuple[bool, int, str | None]:
+async def transfer_coins(guild_id: int, from_user_id: int, to_user_id: int, amount: int) -> dict:
     """
-    Attempts to claim daily reward.
-    Returns (success, amount_awarded, time_remaining_or_message).
+    Transfer coins between users.
+    
+    Returns:
+        dict with keys: success, message
     """
-    data = load_economy()
-    record = _get_user_record(data, user_id)
-    now = datetime.now(timezone.utc)
-    last_daily_raw = record.get("last_daily")
-
-    if last_daily_raw:
-        try:
-            last_dt = datetime.fromisoformat(last_daily_raw)
-            diff = now - last_dt
-            if diff < timedelta(hours=24):
-                remaining = timedelta(hours=24) - diff
-                hours, remainder = divmod(int(remaining.total_seconds()), 3600)
-                minutes, seconds = divmod(remainder, 60)
-                time_str = f"{hours}h {minutes}m {seconds}s"
-                return False, 0, time_str
-            # Check streak bonus (if claimed within 48h)
-            if diff < timedelta(hours=48):
-                record["streak"] = record.get("streak", 0) + 1
-            else:
-                record["streak"] = 1
-        except Exception:
-            record["streak"] = 1
-    else:
-        record["streak"] = 1
-
-    streak = record.get("streak", 1)
-    streak_bonus = min((streak - 1) * 20, 200)
-    total_reward = DAILY_REWARD_AMOUNT + streak_bonus
-
-    record["wallet"] = record.get("wallet", 0) + total_reward
-    record["last_daily"] = now.isoformat()
-    save_economy(data)
-    return True, total_reward, f"Streak: **{streak}** days (+{streak_bonus} bonus)"
-
-
-def transfer_coins(sender_id: int, receiver_id: int, amount: int) -> tuple[bool, str]:
-    """Transfers coins between two users."""
-    if sender_id == receiver_id:
-        return False, "You cannot transfer coins to yourself."
     if amount <= 0:
-        return False, "Transfer amount must be at least 1 coin."
+        return {'success': False, 'message': 'Amount must be positive'}
+    
+    if not config.SUPABASE_SERVICE_KEY or not config.SUPABASE_URL:
+        return {'success': False, 'message': 'Economy system not available'}
+    
+    try:
+        # Get sender balance
+        sender_balance = await get_balance(guild_id, from_user_id)
+        
+        if sender_balance['coins'] < amount:
+            return {'success': False, 'message': f'Insufficient funds. You have {sender_balance["coins"]} coins.'}
+        
+        # Deduct from sender
+        await add_coins(guild_id, from_user_id, -amount, f'transferred to user {to_user_id}')
+        
+        # Add to recipient
+        await add_coins(guild_id, to_user_id, amount, f'received from user {from_user_id}')
+        
+        return {'success': True, 'message': f'Successfully transferred {amount} coins!'}
+    except Exception as e:
+        logger.error(f"Failed to transfer coins: {e}")
+        return {'success': False, 'message': f'Transfer failed: {str(e)}'}
 
-    data = load_economy()
-    sender = _get_user_record(data, sender_id)
-    receiver = _get_user_record(data, receiver_id)
 
-    if sender.get("wallet", 0) < amount:
-        return False, "You do not have enough coins in your wallet."
+async def deposit_coins(guild_id: int, user_id: int, amount: int) -> dict:
+    """
+    Deposit coins from wallet to bank.
+    
+    Returns:
+        dict with keys: success, message
+    """
+    if amount <= 0:
+        return {'success': False, 'message': 'Amount must be positive'}
+    
+    if not config.SUPABASE_SERVICE_KEY or not config.SUPABASE_URL:
+        return {'success': False, 'message': 'Economy system not available'}
+    
+    try:
+        from supabase import create_client
+        supabase = create_client(config.SUPABASE_URL, config.SUPABASE_SERVICE_KEY)
+        
+        balance = await get_balance(guild_id, user_id)
+        
+        if balance['coins'] < amount:
+            return {'success': False, 'message': f'Insufficient funds. You have {balance["coins"]} coins in wallet.'}
+        
+        new_wallet = balance['coins'] - amount
+        new_bank = balance['bank'] + amount
+        
+        supabase.table('user_economy').update({
+            'coins': new_wallet,
+            'bank': new_bank
+        }).eq('guild_id', str(guild_id)).eq('user_id', str(user_id)).execute()
+        
+        return {'success': True, 'message': f'Deposited {amount} coins to bank!'}
+    except Exception as e:
+        logger.error(f"Failed to deposit: {e}")
+        return {'success': False, 'message': f'Deposit failed: {str(e)}'}
 
-    sender["wallet"] -= amount
-    receiver["wallet"] = receiver.get("wallet", 0) + amount
-    save_economy(data)
-    return True, "Success"
+
+async def withdraw_coins(guild_id: int, user_id: int, amount: int) -> dict:
+    """
+    Withdraw coins from bank to wallet.
+    
+    Returns:
+        dict with keys: success, message
+    """
+    if amount <= 0:
+        return {'success': False, 'message': 'Amount must be positive'}
+    
+    if not config.SUPABASE_SERVICE_KEY or not config.SUPABASE_URL:
+        return {'success': False, 'message': 'Economy system not available'}
+    
+    try:
+        from supabase import create_client
+        supabase = create_client(config.SUPABASE_URL, config.SUPABASE_SERVICE_KEY)
+        
+        balance = await get_balance(guild_id, user_id)
+        
+        if balance['bank'] < amount:
+            return {'success': False, 'message': f'Insufficient bank balance. You have {balance["bank"]} coins in bank.'}
+        
+        new_wallet = balance['coins'] + amount
+        new_bank = balance['bank'] - amount
+        
+        supabase.table('user_economy').update({
+            'coins': new_wallet,
+            'bank': new_bank
+        }).eq('guild_id', str(guild_id)).eq('user_id', str(user_id)).execute()
+        
+        return {'success': True, 'message': f'Withdrew {amount} coins from bank!'}
+    except Exception as e:
+        logger.error(f"Failed to withdraw: {e}")
+        return {'success': False, 'message': f'Withdrawal failed: {str(e)}'}
 
 
-def get_rich_leaderboard(limit: int = 10) -> list[dict]:
-    """Returns top users sorted by wallet balance."""
-    data = load_economy()
-    users = []
-    for uid_str, record in data.items():
-        if uid_str.isdigit():
+async def get_richest_users(guild_id: int, limit: int = 10) -> list:
+    """
+    Get richest users in the guild (wallet + bank).
+    
+    Returns:
+        List of dicts with keys: user_id, coins, bank, total
+    """
+    if not config.SUPABASE_SERVICE_KEY or not config.SUPABASE_URL:
+        return []
+    
+    try:
+        from supabase import create_client
+        supabase = create_client(config.SUPABASE_URL, config.SUPABASE_SERVICE_KEY)
+        
+        response = supabase.table('user_economy').select('*').eq('guild_id', str(guild_id)).execute()
+        
+        if not response.data:
+            return []
+        
+        # Calculate totals and sort
+        users = []
+        for user in response.data:
+            total = user['coins'] + user['bank']
             users.append({
-                "user_id": int(uid_str),
-                "wallet": record.get("wallet", 0),
-                "games_won": record.get("games_won", 0),
+                'user_id': user['user_id'],
+                'coins': user['coins'],
+                'bank': user['bank'],
+                'total': total
             })
-    users.sort(key=lambda x: x["wallet"], reverse=True)
-    return users[:limit]
+        
+        users.sort(key=lambda x: x['total'], reverse=True)
+        return users[:limit]
+    except Exception as e:
+        logger.error(f"Failed to get richest users: {e}")
+        return []
