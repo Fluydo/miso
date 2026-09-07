@@ -27,13 +27,13 @@ class BotProfileCog(commands.Cog):
     @app_commands.checks.has_permissions(administrator=True)
     async def randomize_profile(self, interaction: discord.Interaction) -> None:
         """Randomize bot profile with random name, pfp, and banner."""
-        if not interaction.guild:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-            return
-
-        await interaction.response.defer(ephemeral=True)
-
         try:
+            if not interaction.guild:
+                await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+                return
+
+            await interaction.response.defer(ephemeral=True)
+            logger.info(f"Randomize command started for guild {interaction.guild.name}")
             # Get random profile
             display_name, pfp_filename, banner_filename = get_random_profile()
 
@@ -170,8 +170,26 @@ class BotProfileCog(commands.Cog):
 
         except Exception as e:
             logger.error(f"Error in randomize command: {e}", exc_info=True)
-            await interaction.followup.send(f"❌ Failed to randomize profile: {str(e)}", ephemeral=True)
+            try:
+                await interaction.followup.send(f"❌ Failed to randomize profile: {str(e)}", ephemeral=True)
+            except:
+                logger.error("Failed to send error message to user")
 
 
 async def setup(bot: commands.Bot) -> None:
-    await bot.add_cog(BotProfileCog(bot))
+    cog = BotProfileCog(bot)
+    await bot.add_cog(cog)
+    
+    @cog.randomize_profile.error
+    async def randomize_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if isinstance(error, app_commands.errors.MissingPermissions):
+            await interaction.response.send_message("❌ You need Administrator permissions to use this command.", ephemeral=True)
+        else:
+            logger.error(f"Error in randomize command: {error}", exc_info=error)
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(f"❌ An error occurred: {str(error)}", ephemeral=True)
+                else:
+                    await interaction.followup.send(f"❌ An error occurred: {str(error)}", ephemeral=True)
+            except:
+                pass
