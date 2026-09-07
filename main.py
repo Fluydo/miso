@@ -278,6 +278,20 @@ class MisoBot(commands.Bot):
             self.emoji_sync_task.start()
             logger.info("Started emoji sync task (syncs every hour)")
 
+        # Start bot profile sync task (every 5 minutes)
+        if not hasattr(self, 'profile_sync_task') or self.profile_sync_task is None or self.profile_sync_task.done():
+            @tasks.loop(minutes=5)
+            async def profile_syncer():
+                try:
+                    from functions.bot_profile import sync_all_guild_profiles
+                    await sync_all_guild_profiles(self)
+                except Exception as e:
+                    logger.error(f"Profile sync task error: {e}")
+            
+            self.profile_sync_task = profile_syncer
+            self.profile_sync_task.start()
+            logger.info("Started bot profile sync task (syncs every 5 minutes)")
+
         # Start STOP signal checker (every 10 seconds)
         if not self.stop_check_task or self.stop_check_task.done():
             @tasks.loop(seconds=10)

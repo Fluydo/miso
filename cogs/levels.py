@@ -117,6 +117,7 @@ class Levels(commands.Cog):
 
         level, xp, leveled_up = add_xp(message.guild.id, message.author.id)
         if leveled_up:
+            # Add milestone roles if reached
             roles = await self._ensure_milestone_roles(message.guild)
             for m_lvl in LEVEL_MILESTONES:
                 if level >= m_lvl and m_lvl in roles:
@@ -126,6 +127,40 @@ class Levels(commands.Cog):
                             await message.author.add_roles(target_role, reason=f"Reached Level {level} milestone")
                         except discord.Forbidden:
                             pass
+
+            # Send level-up message with rank card
+            try:
+                # Calculate next level XP requirement
+                from functions.levels import xp_required_for_level
+                next_req = xp_required_for_level(level + 1)
+                _, __, ___, rank_pos = get_user_level(message.guild.id, message.author.id)
+                
+                # Render rank card
+                png_bytes = await render_rank_card(
+                    avatar_url=message.author.display_avatar.url,
+                    username=message.author.name,
+                    level=level,
+                    current_xp=xp,
+                    required_xp=next_req,
+                    rank_pos=rank_pos,
+                )
+                
+                # Create embed
+                embed = discord.Embed(
+                    title="🎉 Level Up!",
+                    description=f"Congratulations {message.author.mention}! You've reached **Level {level}**!",
+                    color=discord.Color.gold()
+                )
+                embed.set_image(url="attachment://levelup.png")
+                embed.set_footer(text=f"Keep chatting to reach Level {level + 1}!")
+                
+                file = discord.File(io.BytesIO(png_bytes), filename="levelup.png")
+                
+                # Send in the same channel where they leveled up
+                await message.channel.send(embed=embed, file=file)
+                
+            except Exception as e:
+                logger.error(f"Failed to send level-up message: {e}", exc_info=True)
 
     # ==========================================
     # /RANK
