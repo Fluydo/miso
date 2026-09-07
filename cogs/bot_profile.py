@@ -53,11 +53,27 @@ class BotProfileCog(commands.Cog):
                             with open(pfp_path, 'rb') as f:
                                 pfp_data = f.read()
                             
+                            # Detect content type from extension
+                            ext = pfp_path.suffix.lower()
+                            content_type = 'image/png'
+                            if ext == '.jpg' or ext == '.jpeg':
+                                content_type = 'image/jpeg'
+                            elif ext == '.gif':
+                                content_type = 'image/gif'
+                            
                             storage_path = f"{interaction.guild.id}/avatar_{pfp_filename}"
+                            
+                            # Delete old file if exists
+                            try:
+                                supabase.storage.from_('bot-profiles').remove([storage_path])
+                            except:
+                                pass
+                            
+                            # Upload new file
                             upload_result = supabase.storage.from_('bot-profiles').upload(
                                 storage_path,
                                 pfp_data,
-                                file_options={"content-type": "image/png", "upsert": "true"}
+                                file_options={"content-type": content_type}
                             )
                             
                             # Get public URL
@@ -65,7 +81,7 @@ class BotProfileCog(commands.Cog):
                             avatar_url = public_url_result
                             logger.info(f"Uploaded pfp to: {avatar_url}")
                         except Exception as e:
-                            logger.error(f"Failed to upload pfp: {e}")
+                            logger.error(f"Failed to upload pfp: {e}", exc_info=True)
 
                 # Upload banner
                 if banner_filename:
@@ -75,11 +91,27 @@ class BotProfileCog(commands.Cog):
                             with open(banner_path, 'rb') as f:
                                 banner_data = f.read()
                             
+                            # Detect content type from extension
+                            ext = banner_path.suffix.lower()
+                            content_type = 'image/png'
+                            if ext == '.jpg' or ext == '.jpeg':
+                                content_type = 'image/jpeg'
+                            elif ext == '.gif':
+                                content_type = 'image/gif'
+                            
                             storage_path = f"{interaction.guild.id}/banner_{banner_filename}"
+                            
+                            # Delete old file if exists
+                            try:
+                                supabase.storage.from_('bot-profiles').remove([storage_path])
+                            except:
+                                pass
+                            
+                            # Upload new file
                             upload_result = supabase.storage.from_('bot-profiles').upload(
                                 storage_path,
                                 banner_data,
-                                file_options={"content-type": "image/png", "upsert": "true"}
+                                file_options={"content-type": content_type}
                             )
                             
                             # Get public URL
@@ -87,7 +119,7 @@ class BotProfileCog(commands.Cog):
                             banner_url = public_url_result
                             logger.info(f"Uploaded banner to: {banner_url}")
                         except Exception as e:
-                            logger.error(f"Failed to upload banner: {e}")
+                            logger.error(f"Failed to upload banner: {e}", exc_info=True)
 
                 # Update bot profile in database
                 try:
