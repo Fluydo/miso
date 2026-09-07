@@ -31,12 +31,15 @@ class Daily(commands.Cog):
         result = await claim_daily_reward(interaction.guild.id, interaction.user.id)
 
         if result['success']:
-            # Award XP and coins
+            # Award XP and coins with boost multiplier
             from functions.levels import add_xp_raw
             from functions.economy import add_coins
+            from functions.xp_boosts import get_boost_multiplier
             
             try:
-                add_xp_raw(interaction.guild.id, interaction.user.id, result['bonus_xp'])
+                boost_mult = await get_boost_multiplier(interaction.guild.id)
+                final_xp = int(result['bonus_xp'] * boost_mult)
+                add_xp_raw(interaction.guild.id, interaction.user.id, final_xp)
             except:
                 pass
             

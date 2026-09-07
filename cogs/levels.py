@@ -25,7 +25,7 @@ from functions.levels import (
     LEVEL_MILESTONES,
     MILESTONE_ROLE_COLORS,
     MILESTONE_ROLE_NAMES,
-    add_xp,
+    add_xp_with_boost,
     admin_give_level,
     admin_give_xp,
     admin_set_level,
@@ -115,7 +115,7 @@ class Levels(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
-        level, xp, leveled_up = add_xp(message.guild.id, message.author.id)
+        level, xp, leveled_up = await add_xp_with_boost(message.guild.id, message.author.id)
         if leveled_up:
             # Add milestone roles if reached
             roles = await self._ensure_milestone_roles(message.guild)

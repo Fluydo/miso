@@ -292,6 +292,22 @@ class MisoBot(commands.Bot):
             self.profile_sync_task.start()
             logger.info("Started bot profile sync task (syncs every 5 minutes)")
 
+        # Start XP boost cleanup task (every 5 minutes)
+        if not hasattr(self, 'xp_boost_cleanup_task') or self.xp_boost_cleanup_task is None or self.xp_boost_cleanup_task.done():
+            @tasks.loop(minutes=5)
+            async def xp_boost_cleanup():
+                try:
+                    from functions.xp_boosts import cleanup_expired_boosts
+                    count = await cleanup_expired_boosts()
+                    if count > 0:
+                        logger.info(f"Cleaned up {count} expired XP boost events")
+                except Exception as e:
+                    logger.error(f"XP boost cleanup task error: {e}")
+            
+            self.xp_boost_cleanup_task = xp_boost_cleanup
+            self.xp_boost_cleanup_task.start()
+            logger.info("Started XP boost cleanup task (runs every 5 minutes)")
+
         # Start STOP signal checker (every 10 seconds)
         if not self.stop_check_task or self.stop_check_task.done():
             @tasks.loop(seconds=10)

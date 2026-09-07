@@ -115,6 +115,8 @@ def add_xp(guild_id: int, user_id: int, xp_to_add: int = 15) -> tuple[int, int, 
     """
     Adds XP with a 60-second spam cooldown.
     Returns (current_level, current_xp, leveled_up_boolean).
+    
+    Note: This does NOT apply XP boost multipliers. Use add_xp_with_boost() for that.
     """
     now = time.time()
     last_time = _xp_cooldowns.get((guild_id, user_id), 0.0)
@@ -146,6 +148,19 @@ def add_xp(guild_id: int, user_id: int, xp_to_add: int = 15) -> tuple[int, int, 
 
     save_levels(data)
     return record["level"], record["xp"], leveled_up
+
+
+async def add_xp_with_boost(guild_id: int, user_id: int, base_xp: int = 15) -> tuple[int, int, bool]:
+    """
+    Async version of add_xp that applies XP boost multipliers.
+    Returns (current_level, current_xp, leveled_up_boolean).
+    """
+    from functions.xp_boosts import get_boost_multiplier
+    
+    boost_mult = await get_boost_multiplier(guild_id)
+    final_xp = int(base_xp * boost_mult)
+    
+    return add_xp(guild_id, user_id, final_xp)
 
 
 def get_user_level(guild_id: int, user_id: int) -> tuple[int, int, int, int]:

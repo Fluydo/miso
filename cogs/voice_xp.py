@@ -65,11 +65,14 @@ class VoiceXP(commands.Cog):
         elif before.channel is not None and after.channel is None:
             xp_earned = await end_voice_session(guild_id, user_id)
             if xp_earned and xp_earned > 0:
-                # Award XP to levels system
+                # Award XP to levels system with boost multiplier
                 from functions.levels import add_xp_raw
+                from functions.xp_boosts import get_boost_multiplier
                 try:
-                    add_xp_raw(guild_id, user_id, xp_earned)
-                    logger.info(f"User {member.name} earned {xp_earned} voice XP")
+                    boost_mult = await get_boost_multiplier(guild_id)
+                    final_xp = int(xp_earned * boost_mult)
+                    add_xp_raw(guild_id, user_id, final_xp)
+                    logger.info(f"User {member.name} earned {final_xp} voice XP (base: {xp_earned}, boost: {boost_mult}x)")
                 except Exception as e:
                     logger.error(f"Failed to award voice XP: {e}")
         
@@ -79,8 +82,11 @@ class VoiceXP(commands.Cog):
             xp_earned = await end_voice_session(guild_id, user_id)
             if xp_earned and xp_earned > 0:
                 from functions.levels import add_xp_raw
+                from functions.xp_boosts import get_boost_multiplier
                 try:
-                    add_xp_raw(guild_id, user_id, xp_earned)
+                    boost_mult = await get_boost_multiplier(guild_id)
+                    final_xp = int(xp_earned * boost_mult)
+                    add_xp_raw(guild_id, user_id, final_xp)
                 except:
                     pass
             
