@@ -130,6 +130,13 @@ class Levels(commands.Cog):
 
             # Send level-up message with rank card
             try:
+                # Get level-up settings
+                from functions.level_up_messages import get_level_up_settings, format_level_up_message
+                settings = await get_level_up_settings(message.guild.id)
+                
+                if not settings['enabled']:
+                    return
+                
                 # Calculate next level XP requirement
                 from functions.levels import xp_required_for_level
                 next_req = xp_required_for_level(level + 1)
@@ -145,19 +152,48 @@ class Levels(commands.Cog):
                     rank_pos=rank_pos,
                 )
                 
-                # Create embed
+                # Format custom message
+                custom_message = format_level_up_message(
+                    settings['message_template'],
+                    message.author.mention,
+                    level
+                )
+                
+                # Create embed with custom settings
                 embed = discord.Embed(
                     title="🎉 Level Up!",
-                    description=f"Congratulations {message.author.mention}! You've reached **Level {level}**!",
-                    color=discord.Color.gold()
+                    description=custom_message,
+                    color=discord.Color(settings['embed_color'])
                 )
                 embed.set_image(url="attachment://levelup.png")
                 embed.set_footer(text=f"Keep chatting to reach Level {level + 1}!")
                 
                 file = discord.File(io.BytesIO(png_bytes), filename="levelup.png")
                 
-                # Send in the same channel where they leveled up
-                await message.channel.send(embed=embed, file=file)
+                # Determine where to send
+                target_channel = message.channel
+                if settings['channel_id']:
+                    try:
+                        channel = message.guild.get_channel(int(settings['channel_id']))
+                        if channel:
+                            target_channel = channel
+                    except:
+                        pass
+                
+                # Send to channel
+                await target_channel.send(embed=embed, file=file)
+                
+                # Send DM if enabled
+                if settings['send_dm']:
+                    try:
+                        dm_embed = embed.copy()
+                        dm_embed.set_footer(text=f"You leveled up in {message.guild.name}!")
+                        
+                        # Re-create file for DM (can't reuse)
+                        dm_file = discord.File(io.BytesIO(png_bytes), filename="levelup.png")
+                        await message.author.send(embed=dm_embed, file=dm_file)
+                    except discord.Forbidden:
+                        pass  # User has DMs disabled
                 
             except Exception as e:
                 logger.error(f"Failed to send level-up message: {e}", exc_info=True)
@@ -332,4 +368,117 @@ class Levels(commands.Cog):
 
 
 async def setup(bot: commands.Bot) -> None:
-    await bot.add_cog(Levels(bot))
+    cog = Levels(bot)
+    await bot.add_cog(cog)
+    # Register command groups
+    bot.tree.add_command(cog.levelup_group)
+
+
+    # Level-up settings commands
+    levelup_group = app_commands.Group(name="levelup", description="Configure level-up message settings")
+
+    @levelup_group.command(name="toggle", description="Enable or disable level-up messages (Admin only)")
+    @app_commands.describe(enabled="Enable or disable level-up messages")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def levelup_toggle(self, interaction: discord.Interaction, enabled: bool) -> None:
+        """Toggle level-up messages."""
+        if not interaction.guild:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        from functions.level_up_messages import get_level_up_settings, save_level_up_settings
+        
+        settings = await get_level_up_settings(interaction.guild.id)
+        settings['enabled'] = enabled
+        
+        success = await save_level_up_settings(interaction.guild.id, settings)
+        
+        if success:
+            status = "enabled" if enabled else "disabled"
+            await interaction.followup.send(f"✅ Level-up messages have been **{status}**!", ephemeral=True)
+        else:
+            await interaction.followup.send("❌ Failed to update settings.", ephemeral=True)
+
+    @levelup_group.command(name="channel", description="Set which channel to send level-up messages (Admin only)")
+    @app_commands.describe(channel="The channel (leave empty for same channel as message)")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def levelup_channel(
+        self,
+        interaction: discord.Interaction,
+        channel: Optional[discord.TextChannel] = None
+    ) -> None:
+        """Set level-up channel."""
+        if not interaction.guild:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        from functions.level_up_messages import get_level_up_settings, save_level_up_settings
+        
+        settings = await get_level_up_settings(interaction.guild.id)
+        settings['channel_id'] = channel.id if channel else None
+        
+        success = await save_level_up_settings(interaction.guild.id, settings)
+        
+        if success:
+            if channel:
+                await interaction.followup.send(f"✅ Level-up messages will be sent to {channel.mention}!", ephemeral=True)
+            else:
+                await interaction.followup.send("✅ Level-up messages will be sent in the same channel!", ephemeral=True)
+        else:
+            await interaction.followup.send("❌ Failed to update settings.", ephemeral=True)
+
+    @levelup_group.command(name="message", description="Customize the level-up message (Admin only)")
+    @app_commands.describe(template="Message template - use {user} for mention, {level} for level number")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def levelup_message(self, interaction: discord.Interaction, template: str) -> None:
+        """Set custom level-up message."""
+        if not interaction.guild:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        from functions.level_up_messages import get_level_up_settings, save_level_up_settings, format_level_up_message
+        
+        settings = await get_level_up_settings(interaction.guild.id)
+        settings['message_template'] = template
+        
+        success = await save_level_up_settings(interaction.guild.id, settings)
+        
+        if success:
+            # Show preview
+            preview = format_level_up_message(template, interaction.user.mention, 10)
+            await interaction.followup.send(
+                f"✅ Level-up message updated!\n\n**Preview:**\n{preview}",
+                ephemeral=True
+            )
+        else:
+            await interaction.followup.send("❌ Failed to update settings.", ephemeral=True)
+
+    @levelup_group.command(name="dm", description="Toggle sending level-up DMs to users (Admin only)")
+    @app_commands.describe(enabled="Enable or disable DMs")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def levelup_dm(self, interaction: discord.Interaction, enabled: bool) -> None:
+        """Toggle level-up DMs."""
+        if not interaction.guild:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        from functions.level_up_messages import get_level_up_settings, save_level_up_settings
+        
+        settings = await get_level_up_settings(interaction.guild.id)
+        settings['send_dm'] = enabled
+        
+        success = await save_level_up_settings(interaction.guild.id, settings)
+        
+        if success:
+            status = "enabled" if enabled else "disabled"
+            await interaction.followup.send(f"✅ Level-up DMs have been **{status}**!", ephemeral=True)
+        else:
+            await interaction.followup.send("❌ Failed to update settings.", ephemeral=True)
