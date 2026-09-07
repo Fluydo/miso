@@ -185,5 +185,4 @@ class CustomCommands(commands.Cog):
 async def setup(bot: commands.Bot) -> None:
     cog = CustomCommands(bot)
     await bot.add_cog(cog)
-    bot.tree.add_command(cog.custom_group)
-    bot.tree.add_command(cog.cc_group)
+    # Command groups are auto-registered by the cog, no need to manually add them

@@ -253,29 +253,6 @@ class BotProfileCog(commands.Cog):
             except:
                 logger.error("Failed to send error message to user")
 
-
-async def setup(bot: commands.Bot) -> None:
-    cog = BotProfileCog(bot)
-    await bot.add_cog(cog)
-    
-    # Register the bot command group
-    bot.tree.add_command(cog.bot_group)
-    
-    @cog.randomize_profile.error
-    async def randomize_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
-        if isinstance(error, app_commands.errors.MissingPermissions):
-            await interaction.response.send_message("❌ You need Administrator permissions to use this command.", ephemeral=True)
-        else:
-            logger.error(f"Error in randomize command: {error}", exc_info=error)
-            try:
-                if not interaction.response.is_done():
-                    await interaction.response.send_message(f"❌ An error occurred: {str(error)}", ephemeral=True)
-                else:
-                    await interaction.followup.send(f"❌ An error occurred: {str(error)}", ephemeral=True)
-            except:
-                pass
-
-
     # Bot role color management
     bot_group = app_commands.Group(name="bot", description="Bot appearance settings")
 
@@ -283,52 +260,54 @@ async def setup(bot: commands.Bot) -> None:
     @app_commands.describe(role="The role to use for bot coloring")
     @app_commands.checks.has_permissions(administrator=True)
     async def set_bot_role(self, interaction: discord.Interaction, role: discord.Role) -> None:
-        """Set the role that will be colored for the bot."""
-        try:
-            if not interaction.guild:
-                await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-                return
+        """Set which role the bot should color."""
+        if not interaction.guild:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
 
-            await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+
+        from functions.role_colors import save_bot_role_colors, get_random_gradient
+
+        # Get a random gradient
+        color1, color2, gradient_name = get_random_gradient()
+
+        # Save to database
+        await save_bot_role_colors(interaction.guild.id, role.id, color1, color2)
+
+        # Apply color to role
+        try:
+            await role.edit(color=discord.Color(color1))
             
-            # Save to database with random initial colors
-            from functions.role_colors import get_random_gradient, save_bot_role_colors
-            color1, color2, gradient_name = get_random_gradient()
+            embed = discord.Embed(
+                title="🎨 Bot Role Set!",
+                description=f"The bot will now color {role.mention} when using `/randomize`",
+                color=discord.Color(color1)
+            )
+            embed.add_field(
+                name="Current Gradient",
+                value=f"**{gradient_name}**\nColor 1: `{hex(color1)}`\nColor 2: `{hex(color2)}`",
+                inline=False
+            )
+            embed.set_footer(text="Use /randomize to change colors, or set custom colors in the dashboard")
             
-            success = await save_bot_role_colors(interaction.guild.id, role.id, color1, color2)
-            
-            if success:
-                # Apply the color to the role
-                try:
-                    await role.edit(color=discord.Color(color1))
-                    
-                    embed = discord.Embed(
-                        title="✅ Bot Role Set",
-                        description=f"Bot role set to {role.mention}\nInitial gradient: **{gradient_name}**",
-                        color=discord.Color(color1)
-                    )
-                    embed.add_field(
-                        name="Color 1", 
-                        value=f"`#{color1:06X}`",
-                        inline=True
-                    )
-                    embed.add_field(
-                        name="Color 2",
-                        value=f"`#{color2:06X}`",
-                        inline=True
-                    )
-                    embed.set_footer(text="Use /randomize to change colors, or set custom colors in the dashboard")
-                    await interaction.followup.send(embed=embed, ephemeral=True)
-                except discord.Forbidden:
-                    await interaction.followup.send(
-                        "⚠️ Role saved but I don't have permission to change its color. Make sure my role is above this role in the hierarchy.",
-                        ephemeral=True
-                    )
-            else:
-                await interaction.followup.send("❌ Failed to save bot role settings.", ephemeral=True)
-                
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except discord.Forbidden:
+            await interaction.followup.send(
+                f"✅ Bot role set to {role.mention}, but I don't have permission to change its color.\n"
+                "Make sure my role is higher than the target role in the role hierarchy!",
+                ephemeral=True
+            )
         except Exception as e:
-            logger.error(f"Error in set_bot_role: {e}", exc_info=True)
+            logger.error(f"Failed to set bot role: {e}")
+            await interaction.followup.send(f"❌ Failed to set bot role: {str(e)}", ephemeral=True)
+
+
+async def setup(bot: commands.Bot) -> None:
+    cog = BotProfileCog(bot)
+    await bot.add_cog(cog)
+    # Command groups are auto-registered by the cog
+
             try:
                 await interaction.followup.send(f"❌ An error occurred: {str(e)}", ephemeral=True)
             except:

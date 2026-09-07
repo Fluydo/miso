@@ -188,4 +188,4 @@ class XPBoosts(commands.Cog):
 async def setup(bot: commands.Bot) -> None:
     cog = XPBoosts(bot)
     await bot.add_cog(cog)
-    bot.tree.add_command(cog.xpboost_group)
+    # Command groups are auto-registered by the cog, no need to manually add them

@@ -479,5 +479,4 @@ class Levels(commands.Cog):
 async def setup(bot: commands.Bot) -> None:
     cog = Levels(bot)
     await bot.add_cog(cog)
-    # Register level-up command group
-    bot.tree.add_command(cog.levelup_group)
+    # Command groups are auto-registered by the cog, no need to manually add them
