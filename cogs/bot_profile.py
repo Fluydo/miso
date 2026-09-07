@@ -26,6 +26,8 @@ class BotProfileCog(commands.Cog):
     @app_commands.command(name="randomize", description="Randomize the bot's profile in this server (Admin only)")
     @app_commands.checks.has_permissions(administrator=True)
     async def randomize_profile(self, interaction: discord.Interaction) -> None:
+    @app_commands.checks.has_permissions(administrator=True)
+    async def randomize_profile(self, interaction: discord.Interaction) -> None:
         """Randomize bot profile with random name, pfp, and banner."""
         try:
             if not interaction.guild:
@@ -141,9 +143,36 @@ class BotProfileCog(commands.Cog):
             try:
                 # Change nickname (per-guild)
                 bot_member = interaction.guild.get_member(self.bot.user.id)
-                if bot_member:
-                    await bot_member.edit(nick=display_name)
-                    logger.info(f"Changed bot nickname to '{display_name}' in guild {interaction.guild.name}")
+                if not bot_member:
+                    raise Exception("Bot is not a member of this guild")
+                
+                await bot_member.edit(nick=display_name)
+                logger.info(f"Changed bot nickname to '{display_name}' in guild {interaction.guild.name}")
+                
+                # Change bot role color (if configured)
+                from functions.role_colors import fetch_bot_role_colors, get_random_gradient, save_bot_role_colors
+                role_settings = await fetch_bot_role_colors(interaction.guild.id)
+                
+                role_colored = False
+                if role_settings and role_settings.get('role_id'):
+                    role_id = int(role_settings['role_id'])
+                    bot_role = interaction.guild.get_role(role_id)
+                    
+                    if bot_role:
+                        # Get random gradient
+                        color1, color2, gradient_name = get_random_gradient()
+                        
+                        # Use color1 for the role (Discord roles are single color)
+                        try:
+                            await bot_role.edit(color=discord.Color(color1))
+                            # Save both colors to database for dashboard display
+                            await save_bot_role_colors(interaction.guild.id, role_id, color1, color2)
+                            logger.info(f"Changed bot role color to {gradient_name}: {hex(color1)} / {hex(color2)}")
+                            role_colored = True
+                        except discord.Forbidden:
+                            logger.warning(f"Missing permission to change role color in guild {interaction.guild.name}")
+                        except Exception as e:
+                            logger.error(f"Failed to change role color: {e}")
                 
                 # Change avatar and banner globally (affects all servers)
                 if pfp_filename or banner_filename:
@@ -231,6 +260,9 @@ async def setup(bot: commands.Bot) -> None:
     cog = BotProfileCog(bot)
     await bot.add_cog(cog)
     
+    # Register the bot command group
+    bot.tree.add_command(cog.bot_group)
+    
     @cog.randomize_profile.error
     async def randomize_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.errors.MissingPermissions):
@@ -242,5 +274,64 @@ async def setup(bot: commands.Bot) -> None:
                     await interaction.response.send_message(f"❌ An error occurred: {str(error)}", ephemeral=True)
                 else:
                     await interaction.followup.send(f"❌ An error occurred: {str(error)}", ephemeral=True)
+            except:
+                pass
+
+
+    # Bot role color management
+    bot_group = app_commands.Group(name="bot", description="Bot appearance settings")
+
+    @bot_group.command(name="role", description="Set which role to color for the bot (Admin only)")
+    @app_commands.describe(role="The role to use for bot coloring")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def set_bot_role(self, interaction: discord.Interaction, role: discord.Role) -> None:
+        """Set the role that will be colored for the bot."""
+        try:
+            if not interaction.guild:
+                await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+                return
+
+            await interaction.response.defer(ephemeral=True)
+            
+            # Save to database with random initial colors
+            from functions.role_colors import get_random_gradient, save_bot_role_colors
+            color1, color2, gradient_name = get_random_gradient()
+            
+            success = await save_bot_role_colors(interaction.guild.id, role.id, color1, color2)
+            
+            if success:
+                # Apply the color to the role
+                try:
+                    await role.edit(color=discord.Color(color1))
+                    
+                    embed = discord.Embed(
+                        title="✅ Bot Role Set",
+                        description=f"Bot role set to {role.mention}\nInitial gradient: **{gradient_name}**",
+                        color=discord.Color(color1)
+                    )
+                    embed.add_field(
+                        name="Color 1", 
+                        value=f"`#{color1:06X}`",
+                        inline=True
+                    )
+                    embed.add_field(
+                        name="Color 2",
+                        value=f"`#{color2:06X}`",
+                        inline=True
+                    )
+                    embed.set_footer(text="Use /randomize to change colors, or set custom colors in the dashboard")
+                    await interaction.followup.send(embed=embed, ephemeral=True)
+                except discord.Forbidden:
+                    await interaction.followup.send(
+                        "⚠️ Role saved but I don't have permission to change its color. Make sure my role is above this role in the hierarchy.",
+                        ephemeral=True
+                    )
+            else:
+                await interaction.followup.send("❌ Failed to save bot role settings.", ephemeral=True)
+                
+        except Exception as e:
+            logger.error(f"Error in set_bot_role: {e}", exc_info=True)
+            try:
+                await interaction.followup.send(f"❌ An error occurred: {str(e)}", ephemeral=True)
             except:
                 pass
