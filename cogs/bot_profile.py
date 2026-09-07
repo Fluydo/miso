@@ -146,66 +146,44 @@ class BotProfileCog(commands.Cog):
                     logger.info(f"Changed bot nickname to '{display_name}' in guild {interaction.guild.name}")
                 
                 # Change avatar and banner globally (affects all servers)
-                if avatar_url or banner_url:
+                if pfp_filename or banner_filename:
                     user_payload = {}
                     
-                    # If we have a local avatar file, convert to base64 data URI
+                    # If we have a local avatar file, read raw bytes
                     if pfp_filename:
                         pfp_path = get_profile_asset_path("pfps", pfp_filename)
                         if pfp_path:
-                            import base64
                             with open(pfp_path, 'rb') as f:
                                 pfp_data = f.read()
                             
                             file_size_kb = len(pfp_data) / 1024
-                            logger.info(f"Avatar file size: {file_size_kb:.2f} KB")
+                            logger.info(f"Avatar file: {pfp_filename}, size: {file_size_kb:.2f} KB")
                             
                             # Discord avatar limit is 256KB for free bots, 10MB for premium
                             if len(pfp_data) > 256 * 1024:
                                 logger.warning(f"Avatar file is too large ({file_size_kb:.2f} KB), max is 256 KB for free bots")
                             
-                            # Detect mime type
-                            ext = pfp_path.suffix.lower()
-                            mime_type = 'image/png'
-                            if ext in ['.jpg', '.jpeg']:
-                                mime_type = 'image/jpeg'
-                            elif ext == '.gif':
-                                mime_type = 'image/gif'
-                            
-                            avatar_b64 = base64.b64encode(pfp_data).decode('utf-8')
-                            user_payload['avatar'] = f'data:{mime_type};base64,{avatar_b64}'
-                            logger.info(f"Prepared avatar data: {mime_type}, base64 length: {len(avatar_b64)}")
+                            user_payload['avatar'] = pfp_data
                     
-                    # If we have a local banner file, convert to base64 data URI
+                    # If we have a local banner file, read raw bytes
                     if banner_filename:
                         banner_path = get_profile_asset_path("banners", banner_filename)
                         if banner_path:
-                            import base64
                             with open(banner_path, 'rb') as f:
                                 banner_data = f.read()
                             
                             file_size_kb = len(banner_data) / 1024
-                            logger.info(f"Banner file size: {file_size_kb:.2f} KB")
+                            logger.info(f"Banner file: {banner_filename}, size: {file_size_kb:.2f} KB")
                             
                             # Discord banner limit is 256KB for free bots, 10MB for premium
                             if len(banner_data) > 256 * 1024:
                                 logger.warning(f"Banner file is too large ({file_size_kb:.2f} KB), max is 256 KB for free bots")
                             
-                            # Detect mime type
-                            ext = banner_path.suffix.lower()
-                            mime_type = 'image/png'
-                            if ext in ['.jpg', '.jpeg']:
-                                mime_type = 'image/jpeg'
-                            elif ext == '.gif':
-                                mime_type = 'image/gif'
-                            
-                            banner_b64 = base64.b64encode(banner_data).decode('utf-8')
-                            user_payload['banner'] = f'data:{mime_type};base64,{banner_b64}'
-                            logger.info(f"Prepared banner data: {mime_type}, base64 length: {len(banner_b64)}")
+                            user_payload['banner'] = banner_data
                     
                     # Update bot's global profile via Discord API
                     if user_payload:
-                        logger.info(f"Attempting to update bot profile with payload keys: {list(user_payload.keys())}")
+                        logger.info(f"Attempting to update bot profile with: {list(user_payload.keys())}")
                         try:
                             await self.bot.user.edit(**user_payload)
                             logger.info(f"✅ Successfully updated bot avatar/banner globally")
