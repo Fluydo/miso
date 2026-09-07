@@ -244,3 +244,41 @@ def admin_give_xp(guild_id: int, user_id: int, amount: int) -> tuple[int, int, i
     save_levels(data)
     return record["level"], record["xp"], xp_for_level(level + 1)
 
+
+
+
+def add_xp_raw(guild_id: int, user_id: int, xp_amount: int) -> tuple[int, int, bool]:
+    """
+    Add XP directly without cooldown (for voice XP, achievements, etc).
+    
+    Args:
+        guild_id: Guild ID
+        user_id: User ID
+        xp_amount: Amount of XP to add
+    
+    Returns:
+        Tuple of (new_level, new_xp, leveled_up)
+    """
+    data = _load_levels()
+    guild_key = str(guild_id)
+    user_key = str(user_id)
+    
+    if guild_key not in data:
+        data[guild_key] = {}
+    
+    if user_key not in data[guild_key]:
+        data[guild_key][user_key] = {"level": 1, "xp": 0}
+    
+    user_data = data[guild_key][user_key]
+    old_level = user_data["level"]
+    user_data["xp"] += xp_amount
+    
+    # Check for level ups
+    leveled_up = False
+    while user_data["xp"] >= xp_required_for_level(user_data["level"] + 1):
+        user_data["xp"] -= xp_required_for_level(user_data["level"] + 1)
+        user_data["level"] += 1
+        leveled_up = True
+    
+    _save_levels(data)
+    return user_data["level"], user_data["xp"], leveled_up
