@@ -137,34 +137,81 @@ class BotProfileCog(commands.Cog):
                 except Exception as e:
                     logger.error(f"Failed to update bot profile in database: {e}")
 
-            # Apply the profile (change nickname)
+            # Apply the profile changes
             try:
+                # Change nickname (per-guild)
                 bot_member = interaction.guild.get_member(self.bot.user.id)
                 if bot_member:
                     await bot_member.edit(nick=display_name)
                     logger.info(f"Changed bot nickname to '{display_name}' in guild {interaction.guild.name}")
+                
+                # Change avatar and banner globally (affects all servers)
+                if avatar_url or banner_url:
+                    user_payload = {}
+                    
+                    # If we have a local avatar file, convert to base64 data URI
+                    if pfp_filename:
+                        pfp_path = get_profile_asset_path("pfps", pfp_filename)
+                        if pfp_path:
+                            import base64
+                            with open(pfp_path, 'rb') as f:
+                                pfp_data = f.read()
+                            # Detect mime type
+                            ext = pfp_path.suffix.lower()
+                            mime_type = 'image/png'
+                            if ext in ['.jpg', '.jpeg']:
+                                mime_type = 'image/jpeg'
+                            elif ext == '.gif':
+                                mime_type = 'image/gif'
+                            
+                            avatar_b64 = base64.b64encode(pfp_data).decode('utf-8')
+                            user_payload['avatar'] = f'data:{mime_type};base64,{avatar_b64}'
+                    
+                    # If we have a local banner file, convert to base64 data URI
+                    if banner_filename:
+                        banner_path = get_profile_asset_path("banners", banner_filename)
+                        if banner_path:
+                            import base64
+                            with open(banner_path, 'rb') as f:
+                                banner_data = f.read()
+                            # Detect mime type
+                            ext = banner_path.suffix.lower()
+                            mime_type = 'image/png'
+                            if ext in ['.jpg', '.jpeg']:
+                                mime_type = 'image/jpeg'
+                            elif ext == '.gif':
+                                mime_type = 'image/gif'
+                            
+                            banner_b64 = base64.b64encode(banner_data).decode('utf-8')
+                            user_payload['banner'] = f'data:{mime_type};base64,{banner_b64}'
+                    
+                    # Update bot's global profile via Discord API
+                    if user_payload:
+                        await self.bot.user.edit(**user_payload)
+                        logger.info(f"Updated bot avatar/banner globally")
+                        
             except discord.Forbidden:
                 logger.warning(f"Missing permission to change nickname in guild {interaction.guild.name}")
             except Exception as e:
-                logger.error(f"Failed to change nickname: {e}")
+                logger.error(f"Failed to apply profile changes: {e}", exc_info=True)
 
             # Send confirmation embed
             embed = discord.Embed(
                 title="🎲 Bot Profile Randomized!",
-                description=f"I've been given a fresh new look in this server!",
+                description=f"I've been given a fresh new look!",
                 color=discord.Color.green()
             )
-            embed.add_field(name="New Name", value=f"`{display_name}`", inline=False)
+            embed.add_field(name="New Name (This Server)", value=f"`{display_name}`", inline=False)
             
             if avatar_url:
-                embed.add_field(name="Avatar", value="✅ Updated", inline=True)
+                embed.add_field(name="Avatar (Global)", value="✅ Updated", inline=True)
                 embed.set_thumbnail(url=avatar_url)
             
             if banner_url:
-                embed.add_field(name="Banner", value="✅ Updated", inline=True)
+                embed.add_field(name="Banner (Global)", value="✅ Updated", inline=True)
                 embed.set_image(url=banner_url)
             
-            embed.set_footer(text="View the full profile in the dashboard at /server/{guild_id}/bot-profile")
+            embed.set_footer(text="Note: Avatar and banner changes affect all servers • View profile in dashboard")
 
             await interaction.followup.send(embed=embed, ephemeral=True)
 
