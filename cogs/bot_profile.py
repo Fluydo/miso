@@ -156,6 +156,14 @@ class BotProfileCog(commands.Cog):
                             import base64
                             with open(pfp_path, 'rb') as f:
                                 pfp_data = f.read()
+                            
+                            file_size_kb = len(pfp_data) / 1024
+                            logger.info(f"Avatar file size: {file_size_kb:.2f} KB")
+                            
+                            # Discord avatar limit is 256KB for free bots, 10MB for premium
+                            if len(pfp_data) > 256 * 1024:
+                                logger.warning(f"Avatar file is too large ({file_size_kb:.2f} KB), max is 256 KB for free bots")
+                            
                             # Detect mime type
                             ext = pfp_path.suffix.lower()
                             mime_type = 'image/png'
@@ -166,6 +174,7 @@ class BotProfileCog(commands.Cog):
                             
                             avatar_b64 = base64.b64encode(pfp_data).decode('utf-8')
                             user_payload['avatar'] = f'data:{mime_type};base64,{avatar_b64}'
+                            logger.info(f"Prepared avatar data: {mime_type}, base64 length: {len(avatar_b64)}")
                     
                     # If we have a local banner file, convert to base64 data URI
                     if banner_filename:
@@ -174,6 +183,14 @@ class BotProfileCog(commands.Cog):
                             import base64
                             with open(banner_path, 'rb') as f:
                                 banner_data = f.read()
+                            
+                            file_size_kb = len(banner_data) / 1024
+                            logger.info(f"Banner file size: {file_size_kb:.2f} KB")
+                            
+                            # Discord banner limit is 256KB for free bots, 10MB for premium
+                            if len(banner_data) > 256 * 1024:
+                                logger.warning(f"Banner file is too large ({file_size_kb:.2f} KB), max is 256 KB for free bots")
+                            
                             # Detect mime type
                             ext = banner_path.suffix.lower()
                             mime_type = 'image/png'
@@ -184,11 +201,20 @@ class BotProfileCog(commands.Cog):
                             
                             banner_b64 = base64.b64encode(banner_data).decode('utf-8')
                             user_payload['banner'] = f'data:{mime_type};base64,{banner_b64}'
+                            logger.info(f"Prepared banner data: {mime_type}, base64 length: {len(banner_b64)}")
                     
                     # Update bot's global profile via Discord API
                     if user_payload:
-                        await self.bot.user.edit(**user_payload)
-                        logger.info(f"Updated bot avatar/banner globally")
+                        logger.info(f"Attempting to update bot profile with payload keys: {list(user_payload.keys())}")
+                        try:
+                            await self.bot.user.edit(**user_payload)
+                            logger.info(f"✅ Successfully updated bot avatar/banner globally")
+                        except discord.HTTPException as e:
+                            logger.error(f"Discord API error updating profile: {e.status} - {e.text}")
+                            raise
+                        except Exception as e:
+                            logger.error(f"Error updating bot profile: {e}", exc_info=True)
+                            raise
                         
             except discord.Forbidden:
                 logger.warning(f"Missing permission to change nickname in guild {interaction.guild.name}")
