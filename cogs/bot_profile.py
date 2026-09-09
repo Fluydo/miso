@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 cogs/bot_profile.py
 Bot profile management commands.
@@ -148,7 +149,7 @@ class BotProfileCog(commands.Cog):
                 logger.info(f"Changed bot nickname to '{display_name}' in guild {interaction.guild.name}")
                 
                 # Change bot role color (if configured)
-                from functions.role_colors import fetch_bot_role_colors, get_random_gradient, save_bot_role_colors
+                from functions.role_colors import fetch_bot_role_colors, get_random_gradient, save_bot_role_colors, apply_role_gradient_or_solid
                 role_settings = await fetch_bot_role_colors(interaction.guild.id)
                 
                 role_colored = False
@@ -160,12 +161,18 @@ class BotProfileCog(commands.Cog):
                         # Get random gradient
                         color1, color2, gradient_name = get_random_gradient()
                         
-                        # Use color1 for the role (Discord roles are single color)
+                        # Apply gradient if enhanced role colors, otherwise solid
                         try:
-                            await bot_role.edit(color=discord.Color(color1))
+                            applied = await apply_role_gradient_or_solid(
+                                self.bot.http,
+                                interaction.guild,
+                                bot_role,
+                                color1,
+                                color2,
+                            )
                             # Save both colors to database for dashboard display
                             await save_bot_role_colors(interaction.guild.id, role_id, color1, color2)
-                            logger.info(f"Changed bot role color to {gradient_name}: {hex(color1)} / {hex(color2)}")
+                            logger.info(f"Changed bot role color to {gradient_name}: {applied}")
                             role_colored = True
                         except discord.Forbidden:
                             logger.warning(f"Missing permission to change role color in guild {interaction.guild.name}")
@@ -254,9 +261,9 @@ class BotProfileCog(commands.Cog):
                 logger.error("Failed to send error message to user")
 
     # Bot role color management
-    bot_group = app_commands.Group(name="bot", description="Bot appearance settings")
+    profile_group = app_commands.Group(name="bot", description="Bot appearance settings")
 
-    @bot_group.command(name="role", description="Set which role to color for the bot (Admin only)")
+    @profile_group.command(name="role", description="Set which role to color for the bot (Admin only)")
     @app_commands.describe(role="The role to use for bot coloring")
     @app_commands.checks.has_permissions(administrator=True)
     async def set_bot_role(self, interaction: discord.Interaction, role: discord.Role) -> None:
@@ -267,7 +274,7 @@ class BotProfileCog(commands.Cog):
 
         await interaction.response.defer(ephemeral=True)
 
-        from functions.role_colors import save_bot_role_colors, get_random_gradient
+        from functions.role_colors import save_bot_role_colors, get_random_gradient, apply_role_gradient_or_solid
 
         # Get a random gradient
         color1, color2, gradient_name = get_random_gradient()
@@ -275,18 +282,24 @@ class BotProfileCog(commands.Cog):
         # Save to database
         await save_bot_role_colors(interaction.guild.id, role.id, color1, color2)
 
-        # Apply color to role
+        # Apply color to role (gradient if enhanced, otherwise solid)
         try:
-            await role.edit(color=discord.Color(color1))
+            applied = await apply_role_gradient_or_solid(
+                self.bot.http,
+                interaction.guild,
+                role,
+                color1,
+                color2,
+            )
             
             embed = discord.Embed(
                 title="🎨 Bot Role Set!",
-                description=f"The bot will now color {role.mention} when using `/randomize`",
+                description=f"The bot will now color {role.mention} when using `/randomize`\nApplied: `{applied}`",
                 color=discord.Color(color1)
             )
             embed.add_field(
                 name="Current Gradient",
-                value=f"**{gradient_name}**\nColor 1: `{hex(color1)}`\nColor 2: `{hex(color2)}`",
+                value=f"**{gradient_name}**\nColor 1: `#{color1:06X}`\nColor 2: `#{color2:06X}`",
                 inline=False
             )
             embed.set_footer(text="Use /randomize to change colors, or set custom colors in the dashboard")
@@ -307,8 +320,3 @@ async def setup(bot: commands.Bot) -> None:
     cog = BotProfileCog(bot)
     await bot.add_cog(cog)
     # Command groups are auto-registered by the cog
-
-            try:
-                await interaction.followup.send(f"❌ An error occurred: {str(e)}", ephemeral=True)
-            except:
-                pass

@@ -1,3 +1,4 @@
+﻿# -*- coding: utf-8 -*-
 """
 cogs/levels.py
 Leveling & XP Cog for Miso Bot.

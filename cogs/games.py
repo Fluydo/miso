@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 cogs/games.py
 Minigames & Economy Cog for Miso Bot.
@@ -64,12 +65,6 @@ async def remove_balance(user_id: int, amount: int) -> bool:
 
 async def record_game_result(user_id: int, won: bool, profit_or_loss: int) -> None:
     await economy_supabase.record_game_result(user_id, won, profit_or_loss)
-
-async def claim_daily(user_id: int) -> tuple[bool, int, str | None]:
-    return await economy_supabase.claim_daily(user_id)
-
-async def transfer_coins(sender_id: int, receiver_id: int, amount: int) -> tuple[bool, str]:
-    return await economy_supabase.transfer_coins(sender_id, receiver_id, amount)
 
 async def get_rich_leaderboard(limit: int = 10) -> list[dict]:
     return await economy_supabase.get_rich_leaderboard(limit)
@@ -1266,91 +1261,6 @@ class Games(commands.Cog):
         await interaction.response.defer()
         file = await view.get_rendered_page_file()
         await interaction.followup.send(file=file, view=view)
-
-    # ==========================================
-    # /BALANCE
-    # ==========================================
-    @app_commands.command(name="balance", description="Check your or another user's coin balance.")
-    @app_commands.describe(user="The user to check balance for (defaults to yourself)")
-    async def balance(
-        self,
-        interaction: discord.Interaction,
-        user: Optional[discord.User] = None,
-    ) -> None:
-        target = user or interaction.user
-        bal = await get_balance(target.id)
-
-        embed = discord.Embed(
-            title=f"{config.EMOJI_COIN} Coin Balance",
-            description=f"**<@{target.id}>** has **{bal:,}** {config.EMOJI_COIN} coins.",
-            color=config.COLOR_PRIMARY,
-        )
-        embed.set_thumbnail(url=target.display_avatar.url)
-        embed.set_footer(text=f"{config.BOT_NAME} Economy • Use /daily for free coins")
-        await interaction.response.defer()
-        await interaction.followup.send(embed=embed)
-
-    # ==========================================
-    # /DAILY
-    # ==========================================
-    @app_commands.command(name="daily", description="Claim your daily coins reward and build your streak!")
-    async def daily(self, interaction: discord.Interaction) -> None:
-        await interaction.response.defer()
-        success, amount, msg = await claim_daily(interaction.user.id)
-
-        if success:
-            new_bal = await get_balance(interaction.user.id)
-            embed = discord.Embed(
-                title="🎁 Daily Reward Claimed!",
-                description=(
-                    f"You received **+{amount}** {config.EMOJI_COIN} coins!\n"
-                    f"{config.EMOJI_CHEVRON_RIGHT} {msg}\n"
-                    f"{config.EMOJI_DOTSTAR} New Balance: **{new_bal:,}** {config.EMOJI_COIN}"
-                ),
-                color=config.COLOR_SUCCESS,
-            )
-        else:
-            embed = discord.Embed(
-                title="⏳ Daily Already Claimed",
-                description=f"You can claim your next daily reward in **{msg}**.",
-                color=config.COLOR_WARNING,
-            )
-
-        embed.set_footer(text=f"{config.BOT_NAME} Daily Rewards")
-        await interaction.response.defer()
-        await interaction.followup.send(embed=embed)
-
-    # ==========================================
-    # /PAY
-    # ==========================================
-    @app_commands.command(name="pay", description="Transfer coins to another server member.")
-    @app_commands.describe(user="The member to send coins to", amount="Amount of coins to transfer")
-    async def pay(
-        self,
-        interaction: discord.Interaction,
-        user: discord.User,
-        amount: int,
-    ) -> None:
-        success, message = await transfer_coins(interaction.user.id, user.id, amount)
-        if success:
-            new_balance = await get_balance(interaction.user.id)
-            embed = discord.Embed(
-                description=(
-                    f"{config.EMOJI_TICK} Successfully sent **{amount:,}** {config.EMOJI_COIN} "
-                    f"to **<@{user.id}>**!\n"
-                    f"Your New Balance: **{new_balance:,}** {config.EMOJI_COIN}"
-                ),
-                color=config.COLOR_SUCCESS,
-            )
-            await interaction.response.defer()
-            await interaction.followup.send(embed=embed)
-        else:
-            embed = discord.Embed(
-                description=f"{config.EMOJI_CROSS} {message}",
-                color=config.COLOR_ERROR,
-            )
-            await interaction.response.defer()
-            await interaction.followup.send(embed=embed, ephemeral=True)
 
     # ==========================================
     # ADMIN COMMANDS

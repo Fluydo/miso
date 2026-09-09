@@ -1,3 +1,4 @@
+﻿# -*- coding: utf-8 -*-
 """
 cogs/economy.py
 Economy commands - balance, pay, deposit, withdraw, leaderboard.

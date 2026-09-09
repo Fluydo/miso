@@ -1,3 +1,4 @@
+﻿# -*- coding: utf-8 -*-
 """
 cogs/xp_boosts.py
 Commands for managing XP boost events.

@@ -1,3 +1,4 @@
+﻿# -*- coding: utf-8 -*-
 """
 cogs/birthdays.py
 Birthday tracking and automatic celebration system.

@@ -1,3 +1,4 @@
+﻿# -*- coding: utf-8 -*-
 """
 cogs/stats.py
 Personal statistics command - comprehensive user profile stats.

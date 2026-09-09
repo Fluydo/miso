@@ -1,3 +1,4 @@
+﻿# -*- coding: utf-8 -*-
 """
 cogs/custom_commands.py
 Custom command system - create server-specific commands with custom responses.

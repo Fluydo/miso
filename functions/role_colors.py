@@ -6,9 +6,12 @@ Bot role color management with gradient presets.
 import logging
 import random
 from typing import Optional, Tuple
+import discord
 import config
 
 logger = logging.getLogger("miso.functions.role_colors")
+
+ENHANCED_ROLE_COLORS_FEATURE = "ENHANCED_ROLE_COLORS"
 
 # Curated color gradient pairs that work well together
 # Format: (color1_hex, color2_hex, name)
@@ -61,8 +64,8 @@ COLOR_GRADIENTS = [
     # Special gradients
     (0x8B5CF6, 0xEC4899, "Purple Pink"),
     (0x3B82F6, 0x10B981, "Blue Green"),
-    (0xF59E0B, 0xEF4444, "Sunset"),
-    (0x6366F1, 0xEC4899, "Neon"),
+    (0x6366F1, 0x22D3EE, "Indigo Cyan"),
+    (0xEAB308, 0xF97316, "Gold Orange"),
 ]
 
 
@@ -74,6 +77,54 @@ def get_random_gradient() -> Tuple[int, int, str]:
         Tuple of (color1, color2, gradient_name)
     """
     return random.choice(COLOR_GRADIENTS)
+
+
+async def apply_role_gradient_or_solid(
+    http_client,
+    guild: discord.Guild,
+    role: discord.Role,
+    color1: int,
+    color2: int,
+) -> str:
+    """
+    Apply a role color, using a two-color gradient when the guild has
+    ENHANCED_ROLE_COLORS (boost level 2+) unlocked, otherwise a solid color.
+
+    Args:
+        http_client: The bot's internal HTTP client (`bot.http`).
+        guild: The guild the role belongs to.
+        role: The role to color.
+        color1: Primary gradient color (also the solid fallback color).
+        color2: Secondary gradient color.
+
+    Returns:
+        A human-readable description of what was applied.
+
+    Raises:
+        discord.Forbidden: If the bot lacks permission to edit the role.
+        discord.HTTPException: If the role edit request fails.
+    """
+    features = {feature.upper() for feature in (guild.features or [])}
+    if ENHANCED_ROLE_COLORS_FEATURE in features:
+        payload = {
+            "colors": {
+                "primary_color": color1,
+                "secondary_color": color2,
+            }
+        }
+        await http_client.request(
+            discord.http.Route(
+                "PATCH",
+                "/guilds/{guild_id}/roles/{role_id}",
+                guild_id=guild.id,
+                role_id=role.id,
+            ),
+            json=payload,
+        )
+        return f"gradient #{color1:06X} → #{color2:06X}"
+    else:
+        await role.edit(color=discord.Color(color1))
+        return f"solid #{color1:06X}"
 
 
 def get_gradient_by_name(name: str) -> Optional[Tuple[int, int, str]]:

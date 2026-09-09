@@ -1,3 +1,4 @@
+﻿# -*- coding: utf-8 -*-
 """
 cogs/voice_xp.py
 Voice XP tracking - earn XP for being in voice channels.
