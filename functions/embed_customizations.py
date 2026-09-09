@@ -468,8 +468,8 @@ def _build_embed_from_data(data: dict, **variables) -> discord.Embed:
     if author and author.get('name'):
         embed.set_author(
             name=sub(author['name']),
-            icon_url=author.get('icon_url') or discord.utils.MISSING,
-            url=author.get('url') or discord.utils.MISSING,
+            icon_url=author.get('icon_url') or None,
+            url=author.get('url') or None,
         )
 
     # Footer
@@ -477,7 +477,7 @@ def _build_embed_from_data(data: dict, **variables) -> discord.Embed:
     if footer and footer.get('text'):
         embed.set_footer(
             text=sub(footer['text']),
-            icon_url=footer.get('icon_url') or discord.utils.MISSING,
+            icon_url=footer.get('icon_url') or None,
         )
 
     # Images
