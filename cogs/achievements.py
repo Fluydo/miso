@@ -57,56 +57,66 @@ class Achievements(commands.Cog):
                 categories[cat] = []
             categories[cat].append(ach)
         
-        from functions.embed_customizations import build_custom_embed
+        from functions.embed_customizations import build_custom_embed, get_custom_embed_data
 
-        default_embed = discord.Embed(
-            title=f"🏆 {target.display_name}'s Achievements",
-            description=f"**{progress['unlocked_count']}/{progress['total_count']}** unlocked ({progress['completion_percentage']}%)",
-            color=discord.Color.gold()
-        )
-
-        embed = await build_custom_embed(
-            interaction.guild.id,
-            'achievements_list',
-            default_embed,
-            user_name=target.display_name,
-            unlocked=progress['unlocked_count'],
-            total=progress['total_count'],
-            percent=progress['completion_percentage'],
-        )
-        
-        # Always add the dynamic achievement category fields
-        category_names = {
-            'social': '💬 Social',
-            'levels': '⭐ Levels',
-            'economy': '💰 Economy',
-            'voice': '🎤 Voice',
-            'special': '✨ Special'
+        # Build per-achievement placeholder variables: {achievement_id} -> "icon name ✅" or "icon name"
+        ach_vars = {
+            'user_name': target.display_name,
+            'unlocked': progress['unlocked_count'],
+            'total': progress['total_count'],
+            'percent': progress['completion_percentage'],
         }
-        
-        # Clear any template fields from custom embed and re-add real ones
-        embed.clear_fields()
+        for ach in all_achievements:
+            ach_id = ach['id'].lower().replace(' ', '_')
+            icon = ach.get('icon', '🏅')
+            name = ach['name']
+            if ach['id'] in unlocked_ids:
+                ach_vars[ach_id] = f"{icon} ~~{name}~~ ✅"
+                ach_vars[f"{ach_id}_status"] = "✅"
+            else:
+                ach_vars[ach_id] = f"{'🔒 ???' if ach.get('is_hidden') else f'{icon} {name}'}"
+                ach_vars[f"{ach_id}_status"] = "🔒"
 
-        for cat, achievements in categories.items():
-            cat_name = category_names.get(cat, cat.title())
+        # Check if there's a custom embed saved
+        custom_data = await get_custom_embed_data(interaction.guild.id, 'achievements_list')
+
+        if custom_data:
+            # Use the custom embed exactly as saved - just do variable substitution on all text
+            from functions.embed_customizations import _build_embed_from_data
+            embed = _build_embed_from_data(custom_data, **ach_vars)
+            embed.set_thumbnail(url=target.display_avatar.url)
+        else:
+            # No customization - use default dynamic layout
+            embed = discord.Embed(
+                title=f"🏆 {target.display_name}'s Achievements",
+                description=f"**{progress['unlocked_count']}/{progress['total_count']}** unlocked ({progress['completion_percentage']}%)",
+                color=discord.Color.gold()
+            )
             
-            ach_text = ""
-            for ach in achievements[:5]:
-                icon = ach.get('icon', '🏅')
-                name = ach['name']
-                
-                if ach['id'] in unlocked_ids:
-                    ach_text += f"{icon} ~~{name}~~ ✅\n"
-                elif ach.get('is_hidden'):
-                    ach_text += f"🔒 ???\n"
-                else:
-                    ach_text += f"{icon} {name}\n"
+            category_names = {
+                'social': '💬 Social',
+                'levels': '⭐ Levels',
+                'economy': '💰 Economy',
+                'voice': '🎤 Voice',
+                'special': '✨ Special'
+            }
             
-            if ach_text:
-                embed.add_field(name=cat_name, value=ach_text, inline=True)
-        
-        embed.set_thumbnail(url=target.display_avatar.url)
-        if not embed.footer.text:
+            for cat, achievements in categories.items():
+                cat_name = category_names.get(cat, cat.title())
+                ach_text = ""
+                for ach in achievements[:5]:
+                    icon = ach.get('icon', '🏅')
+                    name = ach['name']
+                    if ach['id'] in unlocked_ids:
+                        ach_text += f"{icon} ~~{name}~~ ✅\n"
+                    elif ach.get('is_hidden'):
+                        ach_text += f"🔒 ???\n"
+                    else:
+                        ach_text += f"{icon} {name}\n"
+                if ach_text:
+                    embed.add_field(name=cat_name, value=ach_text, inline=True)
+
+            embed.set_thumbnail(url=target.display_avatar.url)
             embed.set_footer(text="💡 Unlock achievements by playing! Use /achievement [name] for details")
         
         await interaction.followup.send(embed=embed)
