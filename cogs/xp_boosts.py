@@ -60,15 +60,24 @@ class XPBoosts(commands.Cog):
 
         if result['success']:
             # Announce to server
-            embed = discord.Embed(
+            from functions.embed_customizations import build_custom_embed
+            default_embed = discord.Embed(
                 title="🚀 XP Boost Event Started!",
                 description=f"**{multiplier}x XP** is now active for the next **{duration} hours**!",
                 color=discord.Color.gold()
             )
             if reason:
-                embed.add_field(name="Reason", value=reason, inline=False)
-            embed.set_footer(text=f"Started by {interaction.user.display_name}")
-            embed.timestamp = datetime.utcnow()
+                default_embed.add_field(name="Reason", value=reason, inline=False)
+            default_embed.set_footer(text=f"Started by {interaction.user.display_name}")
+            default_embed.timestamp = datetime.utcnow()
+
+            embed = await build_custom_embed(
+                interaction.guild.id, 'xpboost_started', default_embed,
+                multiplier=multiplier,
+                duration=duration,
+                reason=reason or '',
+                server_name=interaction.guild.name,
+            )
 
             # Try to send to general or first available channel
             announcement_channel = None
@@ -108,13 +117,20 @@ class XPBoosts(commands.Cog):
 
         if success:
             # Announce end
-            embed = discord.Embed(
+            from functions.embed_customizations import build_custom_embed
+            default_end = discord.Embed(
                 title="⏰ XP Boost Event Ended",
                 description=f"The **{active['multiplier']}x XP** boost has ended. Thanks for participating!",
                 color=discord.Color.orange()
             )
-            embed.set_footer(text=f"Ended by {interaction.user.display_name}")
-            embed.timestamp = datetime.utcnow()
+            default_end.set_footer(text=f"Ended by {interaction.user.display_name}")
+            default_end.timestamp = datetime.utcnow()
+
+            embed = await build_custom_embed(
+                interaction.guild.id, 'xpboost_ended', default_end,
+                multiplier=active['multiplier'],
+                server_name=interaction.guild.name,
+            )
 
             # Try to send to general or first available channel
             announcement_channel = None

@@ -384,12 +384,24 @@ class Giveaways(commands.Cog):
                         expires_ts = None
                         winner_id = None
 
-                    end_embed = discord.Embed(
+                    from functions.embed_customizations import build_custom_embed
+                    default_end_embed = discord.Embed(
                         title="🎁 GIVEAWAY ENDED 🎁",
                         description=desc,
                         color=config.COLOR_PRIMARY,
                     )
-                    end_embed.set_footer(text=f"Hosted by <@{record['host_id']}> • {config.BOT_NAME} Giveaways")
+                    default_end_embed.set_footer(text=f"Hosted by <@{record['host_id']}> • {config.BOT_NAME} Giveaways")
+                    
+                    winner_mention = f"<@{winner_id}>" if winner_id else ""
+                    end_embed = await build_custom_embed(
+                        guild.id,
+                        'giveaway_ended',
+                        default_end_embed,
+                        winner=winner_mention,
+                        prize=record['prize'],
+                        expires_ts=expires_ts or 0,
+                        host=f"<@{record['host_id']}>",
+                    )
 
                     # Create view based on whether there are winners
                     if winners and winner_id and expires_ts:
@@ -403,7 +415,7 @@ class Giveaways(commands.Cog):
                         # Try to DM the winner
                         try:
                             winner_user = await self.bot.fetch_user(winner_id)
-                            dm_embed = discord.Embed(
+                            default_dm = discord.Embed(
                                 title="🎉 You Won a Giveaway!",
                                 description=(
                                     f"**Prize:** `{record['prize']}`\n"
@@ -412,6 +424,14 @@ class Giveaways(commands.Cog):
                                     f"Check the giveaway channel to redeem your prize!"
                                 ),
                                 color=config.COLOR_PRIMARY,
+                            )
+                            dm_embed = await build_custom_embed(
+                                guild.id,
+                                'giveaway_won_dm',
+                                default_dm,
+                                prize=record['prize'],
+                                server_name=guild.name,
+                                expires_ts=expires_ts,
                             )
                             await winner_user.send(embed=dm_embed)
                             record["dm_sent"] = True
@@ -510,7 +530,7 @@ class Giveaways(commands.Cog):
             if required_role:
                 req_text += f"• Have {required_role.mention} role\n"
 
-        embed = discord.Embed(
+        default_giveaway_embed = discord.Embed(
             title="🎉 GIVEAWAY 🎉",
             description=(
                 f"**Prize:** `{prize}`\n"
@@ -522,7 +542,19 @@ class Giveaways(commands.Cog):
             ),
             color=config.COLOR_PRIMARY,
         )
-        embed.set_footer(text=f"{config.BOT_NAME} Giveaways • Good luck!")
+        default_giveaway_embed.set_footer(text=f"{config.BOT_NAME} Giveaways • Good luck!")
+
+        from functions.embed_customizations import build_custom_embed
+        embed = await build_custom_embed(
+            interaction.guild.id,
+            'giveaway_active',
+            default_giveaway_embed,
+            prize=prize,
+            winners=winners,
+            duration=formatted_dur,
+            end_ts=int(end_ts),
+            host=interaction.user.mention,
+        )
 
         # Initial message
         await interaction.response.defer()

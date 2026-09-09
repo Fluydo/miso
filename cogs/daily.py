@@ -49,67 +49,55 @@ class Daily(commands.Cog):
             except:
                 pass
             
-            # Create success embed
-            embed = discord.Embed(
+            # Create success embed - check for customization first
+            from functions.embed_customizations import build_custom_embed
+            streak_emoji = "🔥" * min(result['streak'], 5)
+            
+            # Pick description based on streak
+            if result['streak'] >= 30:
+                desc = "🎉 **30 DAY STREAK!** You're on fire! (3x rewards)"
+            elif result['streak'] >= 14:
+                desc = "🌟 **2 WEEK STREAK!** Amazing dedication! (2.5x rewards)"
+            elif result['streak'] >= 7:
+                desc = "⭐ **7 DAY STREAK!** Keep it up! (2x rewards)"
+            elif result['streak'] >= 3:
+                desc = "🔥 **3 DAY STREAK!** You're building momentum! (1.5x rewards)"
+            else:
+                desc = "Come back tomorrow to build your streak!"
+            
+            default_embed = discord.Embed(
                 title="🎁 Daily Reward Claimed!",
+                description=desc,
                 color=discord.Color.gold()
             )
             
-            # Streak display with fire emoji
-            streak_emoji = "🔥" * min(result['streak'], 5)
-            embed.add_field(
-                name=f"{streak_emoji} Current Streak",
-                value=f"**{result['streak']} days**",
-                inline=True
+            embed = await build_custom_embed(
+                interaction.guild.id,
+                'daily_reward',
+                default_embed,
+                user=interaction.user.mention,
+                user_name=interaction.user.display_name,
+                streak=result['streak'],
+                longest_streak=result['longest_streak'],
+                xp_earned=result['bonus_xp'],
+                coins_earned=result['bonus_coins'],
+                multiplier=result.get('multiplier', 1.0),
             )
             
-            embed.add_field(
-                name="🏆 Longest Streak",
-                value=f"**{result['longest_streak']} days**",
-                inline=True
-            )
-            
-            embed.add_field(
-                name="\u200b",  # Empty field for spacing
-                value="\u200b",
-                inline=True
-            )
-            
-            # Rewards
-            embed.add_field(
-                name="⭐ XP Earned",
-                value=f"+**{result['bonus_xp']}** XP",
-                inline=True
-            )
-            
-            embed.add_field(
-                name="🪙 Coins Earned",
-                value=f"+**{result['bonus_coins']}** coins",
-                inline=True
-            )
-            
-            embed.add_field(
-                name="\u200b",
-                value="\u200b",
-                inline=True
-            )
-            
-            # Streak milestone messages
-            if result['streak'] >= 30:
-                embed.description = "🎉 **30 DAY STREAK!** You're on fire! (3x rewards)"
-            elif result['streak'] >= 14:
-                embed.description = "🌟 **2 WEEK STREAK!** Amazing dedication! (2.5x rewards)"
-            elif result['streak'] >= 7:
-                embed.description = "⭐ **7 DAY STREAK!** Keep it up! (2x rewards)"
-            elif result['streak'] >= 3:
-                embed.description = "🔥 **3 DAY STREAK!** You're building momentum! (1.5x rewards)"
-            else:
-                embed.description = "Come back tomorrow to build your streak!"
-            
-            if result['was_broken']:
-                embed.set_footer(text="⚠️ Your streak was reset. Start building it again!")
-            else:
-                embed.set_footer(text="💡 Claim daily to increase your streak multiplier!")
+            # Re-add the streak/reward fields on top of whatever the custom embed has
+            if not embed.fields:
+                embed.add_field(name=f"{streak_emoji} Current Streak", value=f"**{result['streak']} days**", inline=True)
+                embed.add_field(name="🏆 Longest Streak", value=f"**{result['longest_streak']} days**", inline=True)
+                embed.add_field(name="\u200b", value="\u200b", inline=True)
+                embed.add_field(name="⭐ XP Earned", value=f"+**{result['bonus_xp']}** XP", inline=True)
+                embed.add_field(name="🪙 Coins Earned", value=f"+**{result['bonus_coins']}** coins", inline=True)
+                embed.add_field(name="\u200b", value="\u200b", inline=True)
+
+            if not embed.footer.text:
+                if result['was_broken']:
+                    embed.set_footer(text="⚠️ Your streak was reset. Start building it again!")
+                else:
+                    embed.set_footer(text="💡 Claim daily to increase your streak multiplier!")
             
             await interaction.followup.send(embed=embed)
             

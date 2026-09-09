@@ -207,7 +207,13 @@ class Moderation(commands.Cog):
             return
 
         try:
-            dm_embed = dm_punishment_embed(interaction.guild.name, "Ban", reason)
+            from functions.embed_customizations import build_custom_embed
+            default_dm = dm_punishment_embed(interaction.guild.name, "Ban", reason)
+            dm_embed = await build_custom_embed(
+                interaction.guild.id, 'dm_punishment', default_dm,
+                action="Ban", server_name=interaction.guild.name,
+                reason=reason, duration_text="",
+            )
             await user.send(embed=dm_embed)
         except (discord.Forbidden, discord.HTTPException):
             pass
@@ -308,7 +314,13 @@ class Moderation(commands.Cog):
         unban_ts = datetime.now(timezone.utc).timestamp() + td.total_seconds()
 
         try:
-            dm_embed = dm_punishment_embed(interaction.guild.name, "Temporary Ban", reason, formatted_duration)
+            from functions.embed_customizations import build_custom_embed
+            default_dm = dm_punishment_embed(interaction.guild.name, "Temporary Ban", reason, formatted_duration)
+            dm_embed = await build_custom_embed(
+                interaction.guild.id, 'dm_punishment', default_dm,
+                action="Temporary Ban", server_name=interaction.guild.name,
+                reason=reason, duration_text=f" for **{formatted_duration}**",
+            )
             await user.send(embed=dm_embed)
         except (discord.Forbidden, discord.HTTPException):
             pass
@@ -393,7 +405,13 @@ class Moderation(commands.Cog):
             return
 
         try:
-            dm_embed = dm_punishment_embed(interaction.guild.name, "Kick", reason)
+            from functions.embed_customizations import build_custom_embed
+            default_dm = dm_punishment_embed(interaction.guild.name, "Kick", reason)
+            dm_embed = await build_custom_embed(
+                interaction.guild.id, 'dm_punishment', default_dm,
+                action="Kick", server_name=interaction.guild.name,
+                reason=reason, duration_text="",
+            )
             await user.send(embed=dm_embed)
         except (discord.Forbidden, discord.HTTPException):
             pass
@@ -492,7 +510,13 @@ class Moderation(commands.Cog):
         formatted_duration = format_duration(td)
 
         try:
-            dm_embed = dm_punishment_embed(interaction.guild.name, "Timeout", reason, formatted_duration)
+            from functions.embed_customizations import build_custom_embed
+            default_dm = dm_punishment_embed(interaction.guild.name, "Timeout", reason, formatted_duration)
+            dm_embed = await build_custom_embed(
+                interaction.guild.id, 'dm_punishment', default_dm,
+                action="Timeout", server_name=interaction.guild.name,
+                reason=reason, duration_text=f" for **{formatted_duration}**",
+            )
             await user.send(embed=dm_embed)
         except (discord.Forbidden, discord.HTTPException):
             pass
@@ -644,7 +668,13 @@ class Moderation(commands.Cog):
         total_count = add_warning(interaction.guild.id, user.id, interaction.user.id, reason)
 
         try:
-            dm_embed = dm_punishment_embed(interaction.guild.name, "Warning", reason)
+            from functions.embed_customizations import build_custom_embed
+            default_dm = dm_punishment_embed(interaction.guild.name, "Warning", reason)
+            dm_embed = await build_custom_embed(
+                interaction.guild.id, 'dm_punishment', default_dm,
+                action="Warning", server_name=interaction.guild.name,
+                reason=reason, duration_text="",
+            )
             await user.send(embed=dm_embed)
         except (discord.Forbidden, discord.HTTPException):
             pass

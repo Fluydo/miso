@@ -160,14 +160,28 @@ class Levels(commands.Cog):
                     level
                 )
                 
-                # Create embed with custom settings
-                embed = discord.Embed(
+                # Create embed with custom settings (or customizer override)
+                default_embed = discord.Embed(
                     title="🎉 Level Up!",
                     description=custom_message,
                     color=discord.Color(settings['embed_color'])
                 )
-                embed.set_image(url="attachment://levelup.png")
-                embed.set_footer(text=f"Keep chatting to reach Level {level + 1}!")
+                default_embed.set_image(url="attachment://levelup.png")
+                default_embed.set_footer(text=f"Keep chatting to reach Level {level + 1}!")
+
+                from functions.embed_customizations import build_custom_embed
+                embed = await build_custom_embed(
+                    message.guild.id,
+                    'level_up',
+                    default_embed,
+                    user=message.author.mention,
+                    user_name=message.author.display_name,
+                    level=level,
+                    next_level=level + 1,
+                    server_name=message.guild.name,
+                )
+                if not embed.image.url:
+                    embed.set_image(url="attachment://levelup.png")
                 
                 file = discord.File(io.BytesIO(png_bytes), filename="levelup.png")
                 

@@ -57,13 +57,25 @@ class Achievements(commands.Cog):
                 categories[cat] = []
             categories[cat].append(ach)
         
-        embed = discord.Embed(
+        from functions.embed_customizations import build_custom_embed
+
+        default_embed = discord.Embed(
             title=f"🏆 {target.display_name}'s Achievements",
             description=f"**{progress['unlocked_count']}/{progress['total_count']}** unlocked ({progress['completion_percentage']}%)",
             color=discord.Color.gold()
         )
+
+        embed = await build_custom_embed(
+            interaction.guild.id,
+            'achievements_list',
+            default_embed,
+            user_name=target.display_name,
+            unlocked=progress['unlocked_count'],
+            total=progress['total_count'],
+            percent=progress['completion_percentage'],
+        )
         
-        # Add each category
+        # Always add the dynamic achievement category fields
         category_names = {
             'social': '💬 Social',
             'levels': '⭐ Levels',
@@ -72,11 +84,14 @@ class Achievements(commands.Cog):
             'special': '✨ Special'
         }
         
+        # Clear any template fields from custom embed and re-add real ones
+        embed.clear_fields()
+
         for cat, achievements in categories.items():
             cat_name = category_names.get(cat, cat.title())
             
             ach_text = ""
-            for ach in achievements[:5]:  # Show max 5 per category
+            for ach in achievements[:5]:
                 icon = ach.get('icon', '🏅')
                 name = ach['name']
                 
@@ -88,14 +103,11 @@ class Achievements(commands.Cog):
                     ach_text += f"{icon} {name}\n"
             
             if ach_text:
-                embed.add_field(
-                    name=cat_name,
-                    value=ach_text,
-                    inline=True
-                )
+                embed.add_field(name=cat_name, value=ach_text, inline=True)
         
         embed.set_thumbnail(url=target.display_avatar.url)
-        embed.set_footer(text="💡 Unlock achievements by playing! Use /achievement [name] for details")
+        if not embed.footer.text:
+            embed.set_footer(text="💡 Unlock achievements by playing! Use /achievement [name] for details")
         
         await interaction.followup.send(embed=embed)
 
@@ -196,34 +208,37 @@ class Achievements(commands.Cog):
         try:
             icon = achievement.get('icon', '🏅')
             
-            embed = discord.Embed(
-                title=f"🎉 Achievement Unlocked!",
+            default_embed = discord.Embed(
+                title="🎉 Achievement Unlocked!",
                 description=f"{user.mention} unlocked **{icon} {achievement['name']}**!",
                 color=discord.Color.gold()
             )
-            
-            embed.add_field(
-                name="Description",
-                value=achievement['description'],
-                inline=False
+
+            from functions.embed_customizations import build_custom_embed
+            embed = await build_custom_embed(
+                channel.guild.id,
+                'achievement_unlock',
+                default_embed,
+                user=user.mention,
+                user_name=user.display_name,
+                achievement_name=f"{icon} {achievement['name']}",
+                achievement_description=achievement['description'],
+                reward_xp=achievement.get('reward_xp', 0),
+                reward_coins=achievement.get('reward_coins', 0),
             )
             
-            # Show rewards
-            rewards = []
-            if achievement.get('reward_xp', 0) > 0:
-                rewards.append(f"+{achievement['reward_xp']} XP")
-            if achievement.get('reward_coins', 0) > 0:
-                rewards.append(f"+{achievement['reward_coins']} coins")
-            
-            if rewards:
-                embed.add_field(
-                    name="🎁 Rewards",
-                    value=" • ".join(rewards),
-                    inline=False
-                )
+            # Always add dynamic reward fields if not already in custom embed
+            if not embed.fields:
+                embed.add_field(name="Description", value=achievement['description'], inline=False)
+                rewards = []
+                if achievement.get('reward_xp', 0) > 0:
+                    rewards.append(f"+{achievement['reward_xp']} XP")
+                if achievement.get('reward_coins', 0) > 0:
+                    rewards.append(f"+{achievement['reward_coins']} coins")
+                if rewards:
+                    embed.add_field(name="🎁 Rewards", value=" • ".join(rewards), inline=False)
             
             embed.set_thumbnail(url=user.display_avatar.url)
-            
             await channel.send(embed=embed)
         except Exception as e:
             logger.error(f"Failed to announce achievement: {e}")

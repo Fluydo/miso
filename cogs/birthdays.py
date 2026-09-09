@@ -235,19 +235,28 @@ class Birthdays(commands.Cog):
                         # Send celebration message
                         message = settings['message_template'].replace('{user}', member.mention)
                         
-                        embed = discord.Embed(
+                        from functions.embed_customizations import build_custom_embed
+                        age = (datetime.now().year - birthday['birth_year']) if birthday.get('birth_year') else None
+
+                        default_bday_embed = discord.Embed(
                             title="🎉 Happy Birthday! 🎂",
                             description=message,
                             color=discord.Color.gold()
                         )
-                        
-                        # Calculate age if year is set
-                        if birthday.get('birth_year'):
-                            age = datetime.now().year - birthday['birth_year']
-                            embed.add_field(name="Age", value=f"{age} years old! 🎈", inline=True)
-                        
-                        embed.set_thumbnail(url=member.display_avatar.url)
-                        embed.set_footer(text="Have an amazing day!")
+                        if age is not None:
+                            default_bday_embed.add_field(name="Age", value=f"{age} years old! 🎈", inline=True)
+                        default_bday_embed.set_thumbnail(url=member.display_avatar.url)
+                        default_bday_embed.set_footer(text="Have an amazing day!")
+
+                        embed = await build_custom_embed(
+                            guild.id, 'birthday_celebration', default_bday_embed,
+                            user=member.mention,
+                            user_name=member.display_name,
+                            age=age or '',
+                            server_name=guild.name,
+                        )
+                        if not embed.thumbnail.url:
+                            embed.set_thumbnail(url=member.display_avatar.url)
                         
                         await channel.send(embed=embed)
                         
@@ -258,13 +267,20 @@ class Birthdays(commands.Cog):
                             
                             # DM the user
                             try:
-                                dm_embed = discord.Embed(
+                                default_dm = discord.Embed(
                                     title="🎂 Happy Birthday!",
                                     description=f"The {guild.name} server celebrated your birthday!\n\n"
                                                f"**Birthday Bonus:**\n"
                                                f"+{settings['bonus_xp']} XP\n"
                                                f"+{settings['bonus_coins']} coins",
                                     color=discord.Color.gold()
+                                )
+                                dm_embed = await build_custom_embed(
+                                    guild.id, 'birthday_dm', default_dm,
+                                    user_name=member.display_name,
+                                    server_name=guild.name,
+                                    bonus_xp=settings['bonus_xp'],
+                                    bonus_coins=settings['bonus_coins'],
                                 )
                                 await member.send(embed=dm_embed)
                             except:

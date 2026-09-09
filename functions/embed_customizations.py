@@ -4,8 +4,10 @@ functions/embed_customizations.py
 Per-server embed customization - allows guilds to override embed text and colors.
 """
 
+import json
 import logging
 from typing import Optional
+import discord
 import config
 
 logger = logging.getLogger("miso.functions.embed_customizations")
@@ -393,3 +395,137 @@ def format_text(template: str, **kwargs) -> str:
     for key, value in kwargs.items():
         template = template.replace(f"{{{key}}}", str(value) if value is not None else "")
     return template
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# EMBED APPLICATION HELPERS
+# These are the functions the bot cogs call at runtime.
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+async def get_custom_embed_data(guild_id: int, embed_key: str) -> Optional[dict]:
+    """
+    Fetch the saved full_embed JSON for a guild+key combo.
+    Returns a dict matching EmbedData structure, or None if not customized.
+    """
+    if not config.SUPABASE_SERVICE_KEY or not config.SUPABASE_URL:
+        return None
+
+    try:
+        from supabase import create_client
+        supabase = create_client(config.SUPABASE_URL, config.SUPABASE_SERVICE_KEY)
+
+        response = (
+            supabase.table('embed_customizations')
+            .select('value')
+            .eq('guild_id', str(guild_id))
+            .eq('embed_key', embed_key)
+            .eq('field_key', 'full_embed')
+            .execute()
+        )
+
+        if response.data and len(response.data) > 0:
+            return json.loads(response.data[0]['value'])
+        return None
+    except Exception as e:
+        logger.debug(f"Could not load embed customization for {embed_key}: {e}")
+        return None
+
+
+def _parse_color(color_val) -> int:
+    """Parse a color value (hex string or int) to Discord color int."""
+    if isinstance(color_val, int):
+        return color_val
+    if isinstance(color_val, str):
+        try:
+            return int(color_val.lstrip('#'), 16)
+        except (ValueError, AttributeError):
+            pass
+    return 0x5865F2  # Discord blurple fallback
+
+
+def _build_embed_from_data(data: dict, **variables) -> discord.Embed:
+    """
+    Build a discord.Embed from a saved EmbedData dict.
+    Performs variable substitution on all text fields.
+    """
+    def sub(text: str) -> str:
+        if not text:
+            return text
+        for k, v in variables.items():
+            text = text.replace('{' + k + '}', str(v) if v is not None else '')
+        return text
+
+    color = _parse_color(data.get('color', '#5865f2'))
+    embed = discord.Embed(
+        title=sub(data.get('title', '')) or None,
+        description=sub(data.get('description', '')) or None,
+        color=color,
+    )
+
+    # Author
+    author = data.get('author', {})
+    if author and author.get('name'):
+        embed.set_author(
+            name=sub(author['name']),
+            icon_url=author.get('icon_url') or _discord.Embed.Empty,
+            url=author.get('url') or _discord.Embed.Empty,
+        )
+
+    # Footer
+    footer = data.get('footer', {})
+    if footer and footer.get('text'):
+        embed.set_footer(
+            text=sub(footer['text']),
+            icon_url=footer.get('icon_url') or _discord.Embed.Empty,
+        )
+
+    # Images
+    if data.get('thumbnail_url'):
+        embed.set_thumbnail(url=data['thumbnail_url'])
+    if data.get('image_url'):
+        embed.set_image(url=data['image_url'])
+
+    # Timestamp
+    if data.get('timestamp'):
+        from datetime import datetime, timezone
+        embed.timestamp = datetime.now(timezone.utc)
+
+    # Fields
+    for field in data.get('fields', []):
+        name = sub(field.get('name', '\u200b'))
+        value = sub(field.get('value', '\u200b'))
+        inline = field.get('inline', False)
+        embed.add_field(name=name or '\u200b', value=value or '\u200b', inline=inline)
+
+    return embed
+
+
+async def build_custom_embed(
+    guild_id: int,
+    embed_key: str,
+    default_embed: 'discord.Embed',
+    **variables
+) -> 'discord.Embed':
+    """
+    Build an embed for a given key.
+    - If the guild has a custom embed saved, returns that (with variable substitution).
+    - Otherwise returns the default_embed unchanged.
+
+    Usage:
+        embed = await build_custom_embed(
+            guild.id,
+            'level_up',
+            default_embed,  # the embed you'd normally send
+            user=member.mention,
+            level=new_level,
+            next_level=new_level + 1,
+            server_name=guild.name,
+        )
+    """
+    custom_data = await get_custom_embed_data(guild_id, embed_key)
+    if custom_data is None:
+        # No customization - use default
+        return default_embed
+
+    return _build_embed_from_data(custom_data, **variables)
